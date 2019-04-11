@@ -13,6 +13,8 @@
 #include "utils.h"
 #include "args.h"
 #include "mlflow.h"
+#include "crayon.h"
+
 #include "models/sentclf_model.h"
 
 namespace dy = dynet;
@@ -81,6 +83,8 @@ train(
     float best_valid_acc = 0;
     unsigned impatience = 0;
 
+    Crayon crayon(out_fn);
+
     for (unsigned it = 0; it < opts.max_iter; ++it)
     {
         // shuffle the permutation vector
@@ -107,9 +111,14 @@ train(
         }
 
         auto training_loss = total_loss / n_train_sents;
-        mlflow.log_metric("train loss",   training_loss);
-        mlflow.log_metric("valid acc",    valid_acc);
-        mlflow.log_metric("effective lr", trainer.learning_rate);
+
+        mlflow.log_metric("train_loss",   training_loss);
+        mlflow.log_metric("valid_acc",    valid_acc);
+        mlflow.log_metric("effective_lr", trainer.learning_rate);
+
+        crayon.log_metric("train_loss",   training_loss, 1 + it);
+        crayon.log_metric("valid_acc",    valid_acc, 1 + it);
+        crayon.log_metric("effective_lr", trainer.learning_rate, 1 + it);
 
         std::cout << "training loss " << training_loss
                   << " valid accuracy " << valid_acc << std::endl;
@@ -199,14 +208,6 @@ int main(int argc, char** argv)
             n_classes));
     clf->load_embeddings(embed_fn.str());
 
-    // tweak filename
-    std::ostringstream fn;
-    fn << opts.save_prefix
-       << "sentclf_"
-       << clf_opts.get_filename()
-       << opts.get_filename()
-       << gcn_opts.get_filename();
-
     /* log mlflow run options */
     MLFlowRun mlflow(opts.mlflow_exp);
 
@@ -226,7 +227,17 @@ int main(int argc, char** argv)
     mlflow.log_parameter("gcn_layers",  std::to_string(gcn_opts.gcn_layers));
     mlflow.log_parameter("dropout",     std::to_string(gcn_opts.dropout));
 
-    mlflow.log_parameter("fn_prefix",   fn.str());
+    mlflow.log_parameter("fn_prefix",   opts.save_prefix);
+
+    // tweak filename
+    std::ostringstream fn;
+    fn << opts.save_prefix
+       << mlflow.run_uuid
+       << "_sentclf_"
+       << clf_opts.get_filename()
+       << "_" << opts.get_filename()
+       << "_" << gcn_opts.get_filename();
+
 
     if (opts.test)
         test(clf, opts, test_fn.str());

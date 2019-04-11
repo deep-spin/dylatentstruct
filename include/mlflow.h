@@ -11,8 +11,6 @@
 #define GIT_COMMIT "0"
 #include "git_commit.h"
 
-#include <iostream>
-
 using nlohmann::json;
 
 struct MLFlowRun
@@ -69,7 +67,6 @@ struct MLFlowRun
             {"key", key},
             {"value", val},
         };
-        std::cout << payload.dump(4) << "\n";
         auto r = cpr::Post(get_url("runs/set-tag"),
                            cpr::Header{{"Content-Type", "application/json"}},
                            cpr::Body{payload.dump()});
@@ -82,9 +79,6 @@ struct MLFlowRun
             {"key", key},
             {"value", val},
         };
-
-        std::cout << payload.dump(4) << "\n";
-
         auto r = cpr::Post(get_url("runs/log-parameter"),
                            cpr::Header{{"Content-Type", "application/json"}},
                            cpr::Body{payload.dump()});
@@ -98,7 +92,6 @@ struct MLFlowRun
             {"key", key},
             {"value", val},
         };
-        std::cout << payload.dump(4) << "\n";
         auto r = cpr::Post(get_url("runs/log-metric"),
                            cpr::Header{{"Content-Type", "application/json"}},
                            cpr::Body{payload.dump()});
