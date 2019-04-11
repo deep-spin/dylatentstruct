@@ -36,8 +36,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
 
     unsigned hidden_dim_;
     unsigned n_classes_;
-
-    bool training_ = false;
+    float dropout_;
 
     explicit
     GCNSentClf(
@@ -47,6 +46,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
         unsigned hidden_dim,
         unsigned stacks,
         unsigned gcn_layers,
+        float dropout,
         unsigned n_classes)
         : BaseEmbedBiLSTMModel(
             params,
@@ -55,14 +55,18 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
             hidden_dim,
             stacks,
             /*update_embed=*/true,
+            dropout,
             "sentclf")
         , gcn_settings{hidden_dim, gcn_layers, false}
         , gcn(p, gcn_settings, hidden_dim)
         , hidden_dim_(hidden_dim)
         , n_classes_(n_classes)
+        , dropout_(dropout)
     {
         p_out_W = p.add_parameters({n_classes_, hidden_dim});
         p_out_b = p.add_parameters({n_classes_});
+
+        gcn.set_dropout(dropout_);
     }
 
     virtual
@@ -71,7 +75,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
         ComputationGraph& cg,
         const SentBatch& batch)
     {
-        training_ = false;
+        set_test_time();
         auto out_v = predict_batch(cg, batch);
         auto out_b = dy::concatenate_to_batch(out_v);
 
@@ -93,6 +97,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
         ComputationGraph& cg,
         const SentBatch& batch)
     {
+        set_train_time();
         auto out = predict_batch(cg, batch);
 
         vector<Expression> losses;
@@ -112,12 +117,10 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
         const SentBatch& batch)
     {
 
-        bilstm->new_graph(cg, training_, true);
+        bilstm.new_graph(cg, training_, true);
         gcn.new_graph(cg, training_, true);
         auto out_b = parameter(cg, p_out_b);
         auto out_W = parameter(cg, p_out_W);
-
-        gcn.set_dropout(.5);
 
         vector<Expression> out;
 

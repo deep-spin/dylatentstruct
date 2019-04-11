@@ -17,6 +17,8 @@ BASE_FLAGS = [
         '-std=c++11',
         '-xc++',
         '-Iinclude/',
+        '-Iopt/cpr/include/',
+        '-Iopt/json/single_include/',
         '-I/usr/lib/',
         '-I/usr/include/',
         '-I/home/vlad/src/dynet/',

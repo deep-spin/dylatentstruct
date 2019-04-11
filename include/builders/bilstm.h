@@ -33,5 +33,8 @@ struct BiLSTMBuilder
     void new_graph(dy::ComputationGraph& cg, bool training, bool update);
     std::vector<dy::Expression> operator()(const std::vector<dy::Expression>& embeddings);
 
+    void set_dropout(float value);
+    void disable_dropout();
+
     unsigned output_rows() const;
 };

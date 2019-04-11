@@ -15,6 +15,9 @@ struct BaseModel
 {
     dy::ParameterCollection p;
 
+    explicit
+    BaseModel(dy::ParameterCollection p) : p(p) {};
+
     void save(const std::string filename)
     {
         dy::TextFileSaver s(filename);
@@ -22,8 +25,7 @@ struct BaseModel
     }
 
     void load(const std::string filename)
-    {
-        dy::TextFileLoader l(filename);
+    { dy::TextFileLoader l(filename);
         l.populate(p);
     }
 };
@@ -33,14 +35,18 @@ struct BaseEmbedBiLSTMModel : BaseModel
 {
     dy::LookupParameter p_emb;
 
-    std::unique_ptr<BiLSTMBuilder> bilstm;
+    //std::unique_ptr<BiLSTMBuilder> bilstm;
+    BiLSTMSettings bilstm_settings;
+    BiLSTMBuilder bilstm;
 
     unsigned vocab_size_;
     unsigned embed_dim_;
     unsigned hidden_dim_;
     unsigned stacks_;
-
     bool update_embed_;
+    float dropout_;
+
+    bool training_ = false;
 
     explicit
     BaseEmbedBiLSTMModel(
@@ -50,24 +56,38 @@ struct BaseEmbedBiLSTMModel : BaseModel
         unsigned hidden_dim,
         unsigned stacks,
         bool update_embed,
+        float dropout,
         std::string model_name="model")
-    : vocab_size_(vocab_size)
+    : BaseModel(params.add_subcollection(model_name))
+    , bilstm_settings{stacks, /*layers=*/1, hidden_dim / 2}
+    , bilstm(p, bilstm_settings, embed_dim)
+    , vocab_size_(vocab_size)
     , embed_dim_(embed_dim)
     , hidden_dim_(hidden_dim)
     , stacks_(stacks)
     , update_embed_(update_embed)
+    , dropout_(dropout)
     {
-        p = params.add_subcollection(model_name);
-
         if (update_embed)
             p_emb = p.add_lookup_parameters(vocab_size_, {embed_dim_});
         else
             p_emb = params.add_lookup_parameters(vocab_size_, {embed_dim_});
 
         assert(hidden_dim_ % 2 == 0);
+    }
 
-        BiLSTMSettings bl_settings = {stacks_, /*layers=*/1, hidden_dim_ / 2};
-        bilstm.reset(new BiLSTMBuilder(p, bl_settings, embed_dim_));
+    void
+    set_train_time()
+    {
+        training_ = true;
+        bilstm.set_dropout(dropout_);
+    }
+
+    void
+    set_test_time()
+    {
+        training_ = false;
+        bilstm.disable_dropout();
     }
 
     void
@@ -110,7 +130,7 @@ struct BaseEmbedBiLSTMModel : BaseModel
                                       : dy::const_lookup(cg, p_emb, w);
         }
 
-        auto enc = (*bilstm)(embeds);
+        auto enc = bilstm(embeds);
 
         return enc;
     }

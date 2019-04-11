@@ -22,6 +22,8 @@ struct TrainOpts : BaseOpts
     bool test = false;
     bool override_dy = true;
 
+    int mlflow_exp = -1;
+    std::string mlflow_name = "";
 
     virtual void parse(int argc, char** argv)
     {
@@ -91,6 +93,20 @@ struct TrainOpts : BaseOpts
                 vals >> batch_size;
                 i += 2;
             }
+            else if (arg == "--mlflow-experiment")
+            {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> mlflow_exp;
+                i += 2;
+            }
+            else if (arg == "--mlflow-name")
+            {
+                assert(i + 1 < argc);
+                mlflow_name = argv[i + 1];
+                i += 2;
+            }
             else
             {
                 i += 1;
@@ -109,6 +125,8 @@ struct TrainOpts : BaseOpts
           << "  Batch size: " << batch_size      << '\n'
           << "          LR: " << lr              << '\n'
           << "       Decay: " << decay           << '\n'
+          << "  MLFlow exp: " << mlflow_exp      << '\n'
+          << "  MLFlow run: " << mlflow_name     << '\n'
           << "  Model file: " << saved_model     << std::endl;
 
         return o;
@@ -133,6 +151,7 @@ struct GCNOpts : BaseOpts
 {
     unsigned lstm_layers = 1;
     unsigned gcn_layers = 1;
+    double dropout = .1;
 
     virtual void parse(int argc, char** argv)
     {
@@ -156,6 +175,14 @@ struct GCNOpts : BaseOpts
                 vals >> gcn_layers;
                 i += 2;
             }
+            if (arg == "--drop")
+            {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dropout;
+                i += 2;
+            }
             else
             {
                 i += 1;
@@ -168,6 +195,7 @@ struct GCNOpts : BaseOpts
         o << "GCN settinsk\n";
         o << " LSTM layers: " << lstm_layers << '\n';
         o << "  GCN layers: " << gcn_layers << '\n';
+        o << "     dropout: " << dropout << '\n';
         return o;
     }
 

@@ -1,17 +1,18 @@
-#include "dynet/nodes.h"
-#include "dynet/dynet.h"
-#include "dynet/dict.h"
-#include "dynet/expr.h"
-#include "dynet/globals.h"
-#include "dynet/io.h"
-#include "dynet/timing.h"
-#include "dynet/training.h"
+#include <dynet/nodes.h>
+#include <dynet/dynet.h>
+#include <dynet/dict.h>
+#include <dynet/expr.h>
+#include <dynet/globals.h>
+#include <dynet/io.h>
+#include <dynet/timing.h>
+#include <dynet/training.h>
 
 #include <iostream>
 #include <algorithm>
 
 #include "utils.h"
 #include "args.h"
+#include "mlflow.h"
 #include "models/sentclf_model.h"
 
 namespace dy = dynet;
@@ -21,8 +22,10 @@ using std::cout;
 using std::endl;
 
 
-float validate(std::unique_ptr<GCNSentClf>& clf,
-               const vector<SentBatch>& data)
+float
+validate(
+    std::unique_ptr<GCNSentClf>& clf,
+    const vector<SentBatch>& data)
 {
     int n_correct = 0;
     int n_total = 0;
@@ -37,9 +40,11 @@ float validate(std::unique_ptr<GCNSentClf>& clf,
 }
 
 
-void test(std::unique_ptr<GCNSentClf>& clf,
-          const TrainOpts& opts,
-          const std::string& test_fn)
+void
+test(
+    std::unique_ptr<GCNSentClf>& clf,
+    const TrainOpts& opts,
+    const std::string& test_fn)
 {
     clf->load(opts.saved_model);
     auto test_data = read_batches<LabeledSentence>(test_fn, opts.batch_size);
@@ -54,7 +59,8 @@ train(
     const TrainOpts& opts,
     const std::string& out_fn,
     const std::string& train_fn,
-    const std::string& valid_fn)
+    const std::string& valid_fn,
+    MLFlowRun& mlflow)
 {
     auto train_data = read_batches<LabeledSentence>(train_fn, opts.batch_size);
     auto valid_data = read_batches<LabeledSentence>(valid_fn, opts.batch_size);
@@ -100,8 +106,12 @@ train(
             valid_acc = validate(clf, valid_data);
         }
 
-        std::cout << "training loss "
-                  << total_loss / n_train_sents
+        auto training_loss = total_loss / n_train_sents;
+        mlflow.log_metric("train loss",   training_loss);
+        mlflow.log_metric("valid acc",    valid_acc);
+        mlflow.log_metric("effective lr", trainer.learning_rate);
+
+        std::cout << "training loss " << training_loss
                   << " valid accuracy " << valid_acc << std::endl;
 
         if ((valid_acc + 0.0001) > best_valid_acc)
@@ -176,17 +186,17 @@ int main(int argc, char** argv)
     unsigned n_classes = line_count(class_fn.str());
     cout << "number of classes: " << n_classes << endl;
 
+
     dy::ParameterCollection params;
-
-    std::unique_ptr<GCNSentClf> clf = nullptr;
-
-    clf.reset(new GCNSentClf(params,
-                              vocab_size,
-                              EMBED_DIM,
-                              /* hidden dim*/ 300,
-                              gcn_opts.lstm_layers,
-                              gcn_opts.gcn_layers,
-                              n_classes));
+    std::unique_ptr<GCNSentClf> clf(new GCNSentClf(
+            params,
+            vocab_size,
+            EMBED_DIM,
+            /* hidden dim*/ 300,
+            gcn_opts.lstm_layers,
+            gcn_opts.gcn_layers,
+            gcn_opts.dropout,
+            n_classes));
     clf->load_embeddings(embed_fn.str());
 
     // tweak filename
@@ -197,10 +207,31 @@ int main(int argc, char** argv)
        << opts.get_filename()
        << gcn_opts.get_filename();
 
+    /* log mlflow run options */
+    MLFlowRun mlflow(opts.mlflow_exp);
+
+    mlflow.set_tag("mlflow.runName", opts.mlflow_name);
+
+    mlflow.log_parameter("dataset",     clf_opts.dataset);
+
+    mlflow.log_parameter("mode",        opts.test ? "test" : "train");
+    mlflow.log_parameter("lr",          std::to_string(opts.lr));
+    mlflow.log_parameter("decay",       std::to_string(opts.decay));
+    mlflow.log_parameter("patience",    std::to_string(opts.patience));
+    mlflow.log_parameter("max_iter",    std::to_string(opts.max_iter));
+    mlflow.log_parameter("saved_model", opts.saved_model);
+    mlflow.log_parameter("batch_size",  std::to_string(opts.batch_size));
+
+    mlflow.log_parameter("lstm_layers", std::to_string(gcn_opts.lstm_layers));
+    mlflow.log_parameter("gcn_layers",  std::to_string(gcn_opts.gcn_layers));
+    mlflow.log_parameter("dropout",     std::to_string(gcn_opts.dropout));
+
+    mlflow.log_parameter("fn_prefix",   fn.str());
+
     if (opts.test)
         test(clf, opts, test_fn.str());
     else
-        train(clf, opts, fn.str(), train_fn.str(), valid_fn.str());
+        train(clf, opts, fn.str(), train_fn.str(), valid_fn.str(), mlflow);
 
     return 0;
 }

@@ -60,6 +60,21 @@ void BiLSTMBuilder::new_graph(dy::ComputationGraph &cg, bool, bool update)
     }
 }
 
+
+void BiLSTMBuilder::set_dropout(float value)
+{
+    for (unsigned stack = 0; stack < settings.stacks; ++stack)
+    {
+        builders.at(stack).first.set_dropout(value);
+        builders.at(stack).second.set_dropout(value);
+    }
+}
+
+void BiLSTMBuilder::disable_dropout()
+{
+    set_dropout(0);
+}
+
 std::vector<dy::Expression> BiLSTMBuilder::operator()(const std::vector<dy::Expression>& embeddings)
 {
     const unsigned size = embeddings.size();
