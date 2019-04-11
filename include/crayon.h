@@ -8,7 +8,7 @@
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
 
-#include<iostream>
+//#include<iostream>
 
 using nlohmann::json;
 
@@ -26,14 +26,14 @@ struct Crayon
         , port(port)
         , run_uuid(run_uuid)
     {
-        std::cerr << "run_uuid" << run_uuid << "\n";
+        //std::cerr << "run_uuid" << run_uuid << "\n";
         std::stringstream url;
         url << "http://" << hostname << ":" << port << "/data";
         json payload = run_uuid;
         auto r = cpr::Post(cpr::Url(url.str()),
                            cpr::Header{{"Content-Type", "application/json"}},
                            cpr::Body{payload.dump()});
-        std::cerr << r.text << "\n";
+        //std::cerr << r.text << "\n";
 
     }
 
@@ -53,7 +53,7 @@ struct Crayon
                            cpr::Header{{"Content-Type", "application/json"}},
                            cpr::Body{payload.dump()});
 
-        std::cerr << r.text << "\n";
+        //std::cerr << r.text << "\n";
     }
 
 private:
