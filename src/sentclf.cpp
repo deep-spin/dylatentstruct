@@ -148,9 +148,10 @@ train(
         if (impatience > opts.patience)
         {
             cout << opts.patience << " epochs without improvement." << endl;
-            return;
+            break;
         }
     }
+    mlflow.log_metric("best_valid_acc", best_valid_acc);
 }
 
 
@@ -205,6 +206,7 @@ int main(int argc, char** argv)
             gcn_opts.lstm_layers,
             gcn_opts.gcn_layers,
             gcn_opts.dropout,
+            gcn_opts.strat,
             n_classes));
     clf->load_embeddings(embed_fn.str());
 
@@ -223,6 +225,7 @@ int main(int argc, char** argv)
     mlflow.log_parameter("saved_model", opts.saved_model);
     mlflow.log_parameter("batch_size",  std::to_string(opts.batch_size));
 
+    mlflow.log_parameter("strategy",    gcn_opts.strat);
     mlflow.log_parameter("lstm_layers", std::to_string(gcn_opts.lstm_layers));
     mlflow.log_parameter("gcn_layers",  std::to_string(gcn_opts.gcn_layers));
     mlflow.log_parameter("dropout",     std::to_string(gcn_opts.dropout));

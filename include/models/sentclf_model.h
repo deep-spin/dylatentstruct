@@ -37,6 +37,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
     unsigned hidden_dim_;
     unsigned n_classes_;
     float dropout_;
+    std::string strategy_;
 
     explicit
     GCNSentClf(
@@ -47,6 +48,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
         unsigned stacks,
         unsigned gcn_layers,
         float dropout,
+        const std::string& strategy,
         unsigned n_classes)
         : BaseEmbedBiLSTMModel(
             params,
@@ -62,6 +64,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
         , hidden_dim_(hidden_dim)
         , n_classes_(n_classes)
         , dropout_(dropout)
+        , strategy_(strategy)
     {
         p_out_W = p.add_parameters({n_classes_, hidden_dim});
         p_out_b = p.add_parameters({n_classes_});
@@ -131,10 +134,19 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
             ctx.insert(ctx.begin(), dy::zeros(cg, {hidden_dim_}));
 
             vector<unsigned> heads;
-            for (auto& h : sample.sentence.heads)
-            {
-                if (h >= 0)
-                    heads.push_back(h);
+
+            if (strategy_ == "corenlp") {
+                for (auto& h : sample.sentence.heads)
+                    if (h >= 0)
+                        heads.push_back(h);
+            } else if (strategy_ == "flat") {
+                heads.assign(n, 0);
+            } else if (strategy_ == "ltr") {
+                for (size_t k = 1; k < n; ++k)
+                    heads.push_back(k + 1);
+                heads.push_back(0);
+            } else {
+                std::abort();
             }
 
             auto G = dy::one_hot(cg, 1 + heads.size(),  heads);

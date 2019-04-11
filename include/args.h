@@ -152,6 +152,7 @@ struct GCNOpts : BaseOpts
     unsigned lstm_layers = 1;
     unsigned gcn_layers = 1;
     double dropout = .1;
+    std::string strat = "corenlp";
 
     virtual void parse(int argc, char** argv)
     {
@@ -183,6 +184,12 @@ struct GCNOpts : BaseOpts
                 vals >> dropout;
                 i += 2;
             }
+            if (arg == "--strat")
+            {
+                assert(i + 1 < argc);
+                strat = argv[i + 1];
+                i += 2;
+            }
             else
             {
                 i += 1;
@@ -192,9 +199,10 @@ struct GCNOpts : BaseOpts
 
     virtual std::ostream& print(std::ostream& o) const
     {
-        o << "GCN settinsk\n";
+        o << "GCN settins\n";
         o << " LSTM layers: " << lstm_layers << '\n';
         o << "  GCN layers: " << gcn_layers << '\n';
+        o << "    strategy: " << strat << '\n';
         o << "     dropout: " << dropout << '\n';
         return o;
     }
@@ -203,7 +211,10 @@ struct GCNOpts : BaseOpts
     const
     {
         std::ostringstream fn;
-        fn << "_lstm_" << lstm_layers << "_gcn_" << gcn_layers;
+        fn << "_lstm_" << lstm_layers
+            << "_gcn_" << gcn_layers
+            << "_drop_" << dropout
+            << "_strat_" << strat;
         return fn.str();
     }
 };
