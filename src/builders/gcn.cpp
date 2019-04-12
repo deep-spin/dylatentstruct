@@ -88,15 +88,17 @@ dy::Expression GCNBuilder::apply(const dy::Expression &input, const dy::Expressi
 
         if (dropout_rate > 0.f)
         {
-            if (_training)
+            if (_training) {
                 current = dy::dropout(current, dropout_rate);
-            else
+            }
+            else {
                 // because of dy bug
                 current = dy::dropout(current, 0.f);
+            }
         }
 
-        //current = dytools::activation(current, settings.activation);
         current = dy::tanh(current);
+        //current = dy::rectify(current);
 
         if (settings.dense)
             last = dy::concatenate({current, last});

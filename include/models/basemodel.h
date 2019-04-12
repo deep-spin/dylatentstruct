@@ -35,7 +35,6 @@ struct BaseEmbedBiLSTMModel : BaseModel
 {
     dy::LookupParameter p_emb;
 
-    //std::unique_ptr<BiLSTMBuilder> bilstm;
     BiLSTMSettings bilstm_settings;
     BiLSTMBuilder bilstm;
 
@@ -119,9 +118,9 @@ struct BaseEmbedBiLSTMModel : BaseModel
         dy::ComputationGraph&cg,
         const Sentence& sent)
     {
-        std::vector<dy::Expression> embeds(sent.size());
 
         auto sent_sz = sent.size();
+        std::vector<dy::Expression> embeds(sent_sz);
 
         for (size_t i = 0; i < sent_sz; ++i)
         {

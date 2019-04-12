@@ -78,9 +78,13 @@ train(
     vector<vector<SentBatch>::iterator> train_iter(n_batches);
     std::iota(train_iter.begin(), train_iter.end(), train_data.begin());
 
-    dy::SimpleSGDTrainer trainer(clf->p, opts.lr);
+    //dy::SimpleSGDTrainer trainer(clf->p, opts.lr);
+    dy::AdamTrainer trainer(clf->p, opts.lr);
+    trainer.clip_threshold = 100;
+    trainer.sparse_updates_enabled = false;
 
     float best_valid_acc = 0;
+    float last_valid_acc = 0;
     unsigned impatience = 0;
 
     Crayon crayon(out_fn);
@@ -98,7 +102,8 @@ train(
             {
                 dy::ComputationGraph cg;
                 auto loss = clf->batch_loss(cg, *batch);
-                total_loss += dy::as_scalar(cg.incremental_forward(loss));
+                auto lossval = dy::as_scalar(cg.incremental_forward(loss));
+                total_loss += lossval;
                 cg.backward(loss);
                 trainer.update();
             }
@@ -123,9 +128,19 @@ train(
         std::cout << "training loss " << training_loss
                   << " valid accuracy " << valid_acc << std::endl;
 
-        if ((valid_acc + 0.0001) > best_valid_acc)
+        if ((valid_acc + 0.0001) > last_valid_acc)
         {
             impatience = 0;
+        }
+        else
+        {
+            trainer.learning_rate *= opts.decay;
+            cout << "Decaying LR to " << trainer.learning_rate << endl;
+            impatience += 1;
+        }
+
+        if (valid_acc > best_valid_acc)
+        {
             best_valid_acc = valid_acc;
 
             std::ostringstream fn;
@@ -138,18 +153,13 @@ train(
                << ".dy";
             clf->save(fn.str());
         }
-        else
-        {
-            trainer.learning_rate *= opts.decay;
-            cout << "Decaying LR to " << trainer.learning_rate << endl;
-            impatience += 1;
-        }
 
         if (impatience > opts.patience)
         {
             cout << opts.patience << " epochs without improvement." << endl;
             break;
         }
+        last_valid_acc = valid_acc;
     }
     mlflow.log_metric("best_valid_acc", best_valid_acc);
 }
@@ -174,6 +184,7 @@ int main(int argc, char** argv)
     if (opts.override_dy)
     {
         dyparams.random_seed = 42;
+
         dyparams.autobatch = true;
     }
 

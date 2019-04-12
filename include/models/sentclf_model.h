@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "models/basemodel.h"
 #include "builders/gcn.h"
+#include "builders/adjmatrix.h"
 
 #include <vector>
 
@@ -39,6 +40,8 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
     float dropout_;
     std::string strategy_;
 
+    std::unique_ptr<TreeAdjacency> tree;
+
     explicit
     GCNSentClf(
         ParameterCollection& params,
@@ -59,6 +62,8 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
             /*update_embed=*/true,
             dropout,
             "sentclf")
+        , p_out_W(p.add_parameters({n_classes, 2 * hidden_dim}))
+        , p_out_b(p.add_parameters({n_classes}))
         , gcn_settings{hidden_dim, gcn_layers, false}
         , gcn(p, gcn_settings, hidden_dim)
         , hidden_dim_(hidden_dim)
@@ -66,10 +71,19 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
         , dropout_(dropout)
         , strategy_(strategy)
     {
-        p_out_W = p.add_parameters({n_classes_, hidden_dim});
-        p_out_b = p.add_parameters({n_classes_});
-
         gcn.set_dropout(dropout_);
+
+        // dynamically assign TreeAdjacency object
+        if (strategy_ == "corenlp")
+            tree.reset(new CustomAdjacency());
+        else if (strategy_ == "flat")
+            tree.reset(new FlatAdjacency());
+        else if (strategy_ == "ltr")
+            tree.reset(new LtrAdjacency());
+        else {
+            std::cerr << "Invalid strategy." << std::endl;
+            std::abort();
+        }
     }
 
     virtual
@@ -122,6 +136,7 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
 
         bilstm.new_graph(cg, training_, true);
         gcn.new_graph(cg, training_, true);
+        tree->new_graph(cg);
         auto out_b = parameter(cg, p_out_b);
         auto out_W = parameter(cg, p_out_W);
 
@@ -129,36 +144,30 @@ struct GCNSentClf : public BaseEmbedBiLSTMModel
 
         for (auto && sample : batch)
         {
-            unsigned n = sample.sentence.size();
             auto ctx = embed_ctx_sent(cg, sample.sentence);
+
+            // root is a vector of all zeros. We have biases.
             ctx.insert(ctx.begin(), dy::zeros(cg, {hidden_dim_}));
 
-            vector<unsigned> heads;
+            //auto X = dy::concatenate_cols(ctx);
+            //auto h = dy::affine_transform({bk, Wk, X});
+            //h = dy::sum_dim(h, {1});
+            //h = h + b_self;
+            //h = dy::tanh(h);
 
-            if (strategy_ == "corenlp") {
-                for (auto& h : sample.sentence.heads)
-                    if (h >= 0)
-                        heads.push_back(h);
-            } else if (strategy_ == "flat") {
-                heads.assign(n, 0);
-            } else if (strategy_ == "ltr") {
-                for (size_t k = 1; k < n; ++k)
-                    heads.push_back(k + 1);
-                heads.push_back(0);
-            } else {
-                std::abort();
-            }
-
-            auto G = dy::one_hot(cg, 1 + heads.size(),  heads);
-
-            G = dy::reshape(G, {1 + n, n});
-            G = dy::concatenate({dy::zeros(cg, {1 + n, 1}), G}, 1);
+            auto G = tree->make_adj(ctx, sample.sentence.heads);
 
             auto X = dy::concatenate_cols(ctx);
-
             auto res = gcn.apply(X, G);
 
-            auto h = dy::pick(res, (unsigned) 0, /*dim=*/1);
+            auto h =  dy::concatenate({
+                dy::mean_dim(res, {1}),
+                dy::max_dim(res, 1)
+            });
+
+            //auto h = dy::pick(res, (unsigned) 0, 1);
+            //h = dy::pick_range(h, 0, hidden_dim_);
+
             h = dy::affine_transform({out_b, out_W, h});
             out.push_back(h);
         }
