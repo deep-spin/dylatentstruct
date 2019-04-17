@@ -1,4 +1,4 @@
-set(JSON_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/json/single_include PARENT_SCOPE)
+# set(JSON_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/json/single_include PARENT_SCOPE)
 
 set(BUILD_CPR_TESTS OFF CACHE BOOL "Don't build cpr tests")
 
@@ -6,5 +6,9 @@ find_package(CURL)
 if(CURL_FOUND)
     set(USE_SYSTEM_CURL ON CACHE BOOL "Use the system curl for faster builds")
 endif()
+
 add_subdirectory(cpr)
 
+
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+add_subdirectory(json)
