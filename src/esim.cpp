@@ -37,10 +37,10 @@ int main(int argc, char** argv)
     std::stringstream vocab_fn, train_fn, valid_fn, test_fn, embed_fn, class_fn;
     vocab_fn << "data/nli/" << args.dataset << ".vocab";
     class_fn << "data/nli/" << args.dataset << ".classes";
-    //train_fn << "data/nli/" << args.dataset << ".train.txt";
-    train_fn << "data/nli/" << args.dataset << ".train-small.txt";
-    //valid_fn << "data/nli/" << args.dataset << ".valid.txt";
-     valid_fn << "data/nli/" << args.dataset << ".train-small.txt";
+    train_fn << "data/nli/" << args.dataset << ".train.txt";
+    //train_fn << "data/nli/" << args.dataset << ".train-small.txt";
+    valid_fn << "data/nli/" << args.dataset << ".valid.txt";
+     //valid_fn << "data/nli/" << args.dataset << ".train-small.txt";
     test_fn  << "data/nli/" << args.dataset << ".test.txt";
     // test_fn  << "data/nli/" << args.dataset << ".train-tiny.txt";
     embed_fn << "data/nli/" << args.dataset << ".embed";
