@@ -1,4 +1,4 @@
-# pragma once
+#pragma once
 
 /* build an adj matrix using different strategies */
 

@@ -1,3 +1,5 @@
+#pragma once
+
 #include <dynet/io.h>
 #include <dynet/rnn.h>
 #include <dynet/lstm.h>
@@ -6,7 +8,7 @@
 #include <string>
 #include <fstream>
 
-#include "utils.h"
+#include "data.h"
 #include "builders/bilstm.h"
 
 namespace dy = dynet;
@@ -16,7 +18,7 @@ struct BaseModel
     dy::ParameterCollection p;
 
     explicit
-    BaseModel(dy::ParameterCollection p) : p(p) {};
+    BaseModel(dy::ParameterCollection&& p) : p(p) {};
 
     void save(const std::string filename)
     {
@@ -97,7 +99,7 @@ struct BaseEmbedBiLSTMModel : BaseModel
         std::ifstream in(filename);
         assert(in);
         std::string line;
-        vector<float> embed(embed_dim_);
+        std::vector<float> embed(embed_dim_);
         unsigned ix = 0;
 
         while (getline(in, line))

@@ -1,4 +1,4 @@
-# pragma once
+#pragma once
 
 #include <dynet/model.h>
 #include <dynet/expr.h>
@@ -41,7 +41,7 @@ struct BilinearScoreBuilder : public ArcScoreBuilder
     {
         U_hed = dy::parameter(cg, p_U_hed);
         U_mod = dy::parameter(cg, p_U_mod);
-        b_hed = dy::parameter(cg, p_b_hed);
+        B_hed = dy::parameter(cg, p_b_hed);
         b_mod = dy::parameter(cg, p_b_mod);
         root = dy::parameter(cg, p_root);
     }

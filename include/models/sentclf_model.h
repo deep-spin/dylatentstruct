@@ -1,4 +1,4 @@
-# pragma once
+#pragma once
 
 #include <string>
 #include <dynet/rnn.h>
@@ -6,7 +6,7 @@
 #include <dynet/tensor.h>
 #include <dynet/index-tensor.h>
 
-#include "utils.h"
+#include "data.h"
 #include "models/basemodel.h"
 #include "builders/gcn.h"
 #include "builders/adjmatrix.h"

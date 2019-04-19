@@ -1,4 +1,5 @@
 #pragma once
+
 #include <iostream>
 #include <cassert>
 #include <sstream>
@@ -263,6 +264,107 @@ struct ClfOpts : BaseOpts
         std::ostringstream fn;
         fn << dataset;
         return fn.str();
+    }
+};
+
+
+struct ESIMArgs : public BaseOpts
+{
+    enum class Attn {SOFTMAX, SPARSEMAX, HEAD};
+    std::string dataset;
+    std::string attn_str = "softmax";
+    float dropout = 0.5;
+    int max_decode_iter;
+    int lstm_layers;
+
+    virtual void parse(int argc, char** argv)
+    {
+        int i = 1;
+        while (i < argc)
+        {
+            std::string arg = argv[i];
+            if (arg == "--dataset")
+            {
+                assert(i + 1 < argc);
+                dataset = argv[i + 1];
+                i += 2;
+            }
+            else if (arg == "--attn")
+            {
+                assert(i + 1 < argc);
+                attn_str = argv[i + 1];
+                i += 2;
+            }
+            else if (arg == "--drop")
+            {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dropout;
+                i += 2;
+            }
+            else if (arg == "--max-decode-iter")
+            {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> max_decode_iter;
+                i += 2;
+            }
+            else if (arg == "--lstm-layers")
+            {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> lstm_layers;
+                i += 2;
+            }
+            else
+            {
+                i += 1;
+            }
+        }
+    }
+
+    Attn get_attn() const
+    {
+        if (attn_str == "softmax")
+            return Attn::SOFTMAX;
+        else if (attn_str == "sparsemax")
+            return Attn::SPARSEMAX;
+        else if (attn_str == "head")
+            return Attn::HEAD;
+        else
+        {
+            std::cerr << "Invalid attention type." << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
+    }
+
+    virtual std::string get_filename()
+    const
+    override
+    {
+        std::ostringstream fn;
+        fn << "_ESIM_"
+           << dataset
+           << "_attn_" << attn_str
+           << "_drop_" << dropout
+           << "_decode_" << max_decode_iter;
+        return fn.str();
+    }
+
+    virtual std::ostream& print(std::ostream& o)
+    const
+    override
+    {
+        o << " ESIM settings\n"
+          << " LSTM layers: " << lstm_layers << '\n'
+          << "     Dataset: " << dataset << '\n'
+          << "     Dropout: " << dropout << '\n'
+          << " Decode iter: " << max_decode_iter << '\n'
+          << "   Attention: " << attn_str << '\n';
+        return o;
     }
 };
 

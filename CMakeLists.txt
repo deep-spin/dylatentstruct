@@ -5,6 +5,13 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+if( EXISTS "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json" )
+  execute_process( COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+    ${CMAKE_CURRENT_SOURCE_DIR}/compile_commands.json
+  )
+endif()
+
 
 # Store git commit in header file
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/.git)
@@ -31,18 +38,39 @@ endif()
 
 find_package(Dynet REQUIRED)
 find_package(Eigen3 REQUIRED)
-# find_package(DySparseMAP REQUIRED)
+find_package(DySparseMAP REQUIRED)
 
 add_subdirectory(opt)
 
 add_library(
     dylatentstruct
 
-    src/builders/gcn.cpp
+    include/args.h
+    include/crayon.h
+    include/mlflow.h
+    include/utils.h
+    include/data.h
+
+    include/models/basemodel.h
+    include/models/sentclf_model.h
+    include/models/basenli.h
+    include/models/esim.h
+
+    include/builders/adjmatrix.h
+    include/builders/arcscorers.h
+    include/builders/bilstm.h
+    include/builders/gcn.h
+    include/builders/biattn.h
+
+    src/data.cpp
     src/builders/bilstm.cpp
+    src/builders/gcn.cpp
+    src/builders/biattn.cpp
 )
 
 target_link_libraries(dylatentstruct
+    DySparseMAP::ad3qp
+    DySparseMAP::dysparsemap
     Eigen3::Eigen
     Dynet::dynet
     nlohmann_json::nlohmann_json
@@ -64,7 +92,7 @@ target_include_directories(
 
 target_compile_options(dylatentstruct PUBLIC
     -Ofast
-    -Werror
+#     -Werror
     -Wall
     -Wextra
     -pedantic
@@ -72,9 +100,11 @@ target_compile_options(dylatentstruct PUBLIC
     -march=native)
 
 add_executable(sentclf src/sentclf.cpp)
+add_executable(esim src/esim.cpp)
 # add_executable(check_gcn_nondet src/check_gcn_nondet.cpp)
 # add_executable(mlflowtest src/mlflowtest.cpp)
 
 target_link_libraries(sentclf PUBLIC dylatentstruct)
+target_link_libraries(esim PUBLIC dylatentstruct)
 #target_link_libraries(mlflowtest PUBLIC dylatentstruct)
 #target_link_libraries(check_gcn_nondet PUBLIC dylatentstruct)

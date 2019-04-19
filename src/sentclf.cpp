@@ -11,6 +11,7 @@
 #include <algorithm>
 
 #include "utils.h"
+#include "data.h"
 #include "args.h"
 #include "mlflow.h"
 #include "crayon.h"
@@ -184,7 +185,6 @@ int main(int argc, char** argv)
     if (opts.override_dy)
     {
         dyparams.random_seed = 42;
-
         dyparams.autobatch = true;
     }
 
