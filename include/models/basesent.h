@@ -14,57 +14,42 @@
 #include "data.h"
 #include "mlflow.h"
 
-namespace dy = dynet;
-
-using dy::ComputationGraph;
-using dy::Expression;
-using dy::LookupParameter;
-using dy::Parameter;
-using dy::ParameterCollection;
-
-using std::cout;
-using std::endl;
 using std::vector;
 
-struct BaseNLI : public BaseEmbedBiLSTMModel
+struct BaseSentClf : public BaseEmbedBiLSTMModel
 {
-    bool training_ = false;
+    unsigned hidden_dim_;
+    unsigned n_classes_;
+    float dropout_;
 
-    // print latent structures at test time
-    bool print_ = false;
-    std::shared_ptr<std::ostream> out_st_;
+    explicit
+    BaseSentClf(
+        dy::ParameterCollection& params,
+        unsigned vocab_size,
+        unsigned embed_dim,
+        unsigned hidden_dim,
+        unsigned n_classes,
+        unsigned stacks = 1,
+        float dropout = .5)
+        : BaseEmbedBiLSTMModel(
+            params,
+            vocab_size,
+            embed_dim,
+            hidden_dim,
+            stacks,
+            /*update_embed=*/true,
+            dropout,
+            "sentclf")
+        , hidden_dim_(hidden_dim)
+        , n_classes_(n_classes)
+        , dropout_(dropout)
+    { }
 
-    explicit BaseNLI(ParameterCollection& params,
-                     unsigned vocab_size,
-                     unsigned embed_dim,
-                     unsigned hidden_dim,
-                     unsigned stacks = 1,
-                     bool update_embed = true,
-                     float dropout_p = 0.5)
-      : BaseEmbedBiLSTMModel(params,
-                             vocab_size,
-                             embed_dim,
-                             hidden_dim,
-                             stacks,
-                             update_embed,
-                             dropout_p,
-                             "nliclf")
-    {}
-
-    void set_print(const std::string& fn)
-    {
-        out_st_.reset(new std::ofstream(fn));
-        print_ = true;
-    }
-
-    void print_param(Expression expr)
-    {
-        auto v = dy::as_vector(expr.value());
-        for (auto&& val : v)
-            (*out_st_) << val << ' ';
-    }
-
-    virtual int n_correct(dy::ComputationGraph& cg, const NLIBatch& batch)
+    virtual
+    int
+    n_correct(
+        dy::ComputationGraph& cg,
+        const SentBatch& batch)
     {
         set_test_time();
         auto out_v = predict_batch(cg, batch);
@@ -75,21 +60,24 @@ struct BaseNLI : public BaseEmbedBiLSTMModel
         auto pred = dy::as_vector(dy::TensorTools::argmax(out));
 
         int n_correct = 0;
-        for (size_t i = 0; i < batch.size(); ++i) {
+        for (unsigned i = 0; i < batch.size(); ++i)
             if (batch[i].target == pred[i])
                 n_correct += 1;
-        }
+
         return n_correct;
     }
 
-    virtual Expression batch_loss(dy::ComputationGraph& cg,
-                                  const NLIBatch& batch)
+    virtual
+    dy::Expression
+    batch_loss(
+        dy::ComputationGraph& cg,
+        const SentBatch& batch)
     {
         set_train_time();
         auto out = predict_batch(cg, batch);
 
-        vector<Expression> losses;
-        for (size_t i = 0; i < batch.size(); ++i) {
+        vector<dy::Expression> losses;
+        for (unsigned i = 0; i < batch.size(); ++i) {
             auto loss = dy::pickneglogsoftmax(out[i], batch[i].target);
             losses.push_back(loss);
         }
@@ -97,13 +85,16 @@ struct BaseNLI : public BaseEmbedBiLSTMModel
         return dy::sum(losses);
     }
 
-    virtual vector<Expression> predict_batch(ComputationGraph& cg,
-                                             const NLIBatch& batch) = 0;
+    virtual
+    vector<dy::Expression>
+    predict_batch(
+        dy::ComputationGraph& cg,
+        const SentBatch& batch) = 0;
 };
 
-// shared training code
+
 float
-validate(std::unique_ptr<BaseNLI>& clf, const vector<NLIBatch>& data)
+validate(std::unique_ptr<BaseSentClf>& clf, const vector<SentBatch>& data)
 {
     int n_correct = 0;
     int n_total = 0;
@@ -117,40 +108,32 @@ validate(std::unique_ptr<BaseNLI>& clf, const vector<NLIBatch>& data)
 }
 
 void
-test(std::unique_ptr<BaseNLI>& clf,
+test(std::unique_ptr<BaseSentClf>& clf,
      const TrainOpts& args,
      const std::string& valid_fn,
      const std::string& test_fn)
 {
     clf->load(args.saved_model);
 
-    std::ostringstream valid_print_fn(args.save_prefix);
-    valid_print_fn << "PRED_valid_" << args.get_filename() << ".txt";
-
-    clf->set_print(valid_print_fn.str());
-    auto valid_data = read_batches<NLIPair>(valid_fn, args.batch_size);
+    auto valid_data = read_batches<LabeledSentence>(valid_fn, args.batch_size);
     float acc = validate(clf, valid_data);
     std::cout << "Validation accuracy: " << acc << std::endl;
 
-    std::ostringstream test_print_fn(args.save_prefix);
-    test_print_fn << "PRED_test_" << args.get_filename() << ".txt";
-
-    clf->set_print(test_print_fn.str());
-    auto test_data = read_batches<NLIPair>(test_fn, args.batch_size);
+    auto test_data = read_batches<LabeledSentence>(test_fn, args.batch_size);
     acc = validate(clf, test_data);
     std::cout << "Test accuracy: " << acc << std::endl;
 }
 
 void
-train(std::unique_ptr<BaseNLI>& clf,
-      const TrainOpts& args,
+train(std::unique_ptr<BaseSentClf>& clf,
+      const TrainOpts& opts,
       const std::string& out_fn,
       const std::string& train_fn,
       const std::string& valid_fn,
       const MLFlowRun& mlflow)
 {
-    auto train_data = read_batches<NLIPair>(train_fn, args.batch_size);
-    auto valid_data = read_batches<NLIPair>(valid_fn, args.batch_size);
+    auto train_data = read_batches<LabeledSentence>(train_fn, opts.batch_size);
+    auto valid_data = read_batches<LabeledSentence>(valid_fn, opts.batch_size);
     auto n_batches = train_data.size();
 
     unsigned n_train_sents = 0;
@@ -160,11 +143,10 @@ train(std::unique_ptr<BaseNLI>& clf,
     std::cout << "Training on " << n_train_sents << " sentences." << std::endl;
 
     // make an identity permutation vector of pointers into the batches
-    vector<vector<NLIBatch>::iterator> train_iter(n_batches);
+    vector<vector<SentBatch>::iterator> train_iter(n_batches);
     std::iota(train_iter.begin(), train_iter.end(), train_data.begin());
 
-    // dy::SimpleSGDTrainer trainer(clf->p, args.lr);
-    dy::AdamTrainer trainer(clf->p, args.lr);
+    dy::AdamTrainer trainer(clf->p, opts.lr);
 
     size_t patience = 0;
     float best_valid_acc = 0;
@@ -172,7 +154,7 @@ train(std::unique_ptr<BaseNLI>& clf,
 
     Crayon crayon(out_fn);
 
-    for (unsigned it = 0; it < args.max_iter; ++it) {
+    for (unsigned it = 0; it < opts.max_iter; ++it) {
         // shuffle the permutation vector
         std::shuffle(train_iter.begin(), train_iter.end(), *dy::rndeng);
 
@@ -185,8 +167,8 @@ train(std::unique_ptr<BaseNLI>& clf,
                 auto loss = clf->batch_loss(cg, *batch);
                 total_loss += dy::as_scalar(cg.incremental_forward(loss));
                 cg.backward(loss);
-                // clf->save("test.dy");
-                // abort();
+                //clf->save("test.dy");
+                //abort();
                 trainer.update();
             }
         }
@@ -214,7 +196,7 @@ train(std::unique_ptr<BaseNLI>& clf,
         if ((valid_acc + 0.0001) > last_valid_acc) {
             patience = 0;
         } else {
-            trainer.learning_rate *= args.decay;
+            trainer.learning_rate *= opts.decay;
             std::cout << "Decay to " << trainer.learning_rate << std::endl;
             patience += 1;
         }
@@ -232,8 +214,8 @@ train(std::unique_ptr<BaseNLI>& clf,
             clf->save(fn.str());
         }
 
-        if (patience > args.patience) {
-            std::cout << args.patience
+        if (patience > opts.patience) {
+            std::cout << opts.patience
             << " epochs without improvement, stopping." << std::endl;
             return;
         }

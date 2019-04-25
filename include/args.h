@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include "sparsemap.h"
+
 struct BaseOpts
 {
     virtual std::ostream& print(std::ostream& o) const = 0;
@@ -215,6 +216,52 @@ struct ClfOpts : BaseOpts
     }
 };
 
+struct ListOpOpts : public BaseOpts
+{
+    size_t hidden_dim;
+    float dropout;
+
+    virtual void parse(int argc, char** argv)
+    {
+        int i = 1;
+        while (i < argc) {
+            std::string arg = argv[i];
+            if (arg == "--hidden-dim") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> hidden_dim;
+                i += 2;
+            } else if (arg == "--drop") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dropout;
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    virtual std::ostream& print(std::ostream& o) const
+    {
+        o << "ListOps task\n"
+          << " hidden dim: " << hidden_dim << '\n'
+          << "    dropout: " << dropout << '\n';
+        return o;
+    }
+
+    virtual std::string get_filename() const
+    {
+        std::ostringstream fn;
+        fn << "_dim" << hidden_dim
+           << "_drop" << dropout
+           << "_";
+        return fn.str();
+    }
+};
+
 struct ESIMArgs : public BaseOpts
 {
     enum class Attn
@@ -352,7 +399,8 @@ struct SparseMAPOpts : BaseOpts
         std::ostringstream fn;
         fn << "sparsemap_max_iter_" << sm_opts.max_iter << "_thr_"
            << sm_opts.residual_thr << "_bw_" << sm_opts.max_iter_backward
-           << "_atol_" << sm_opts.atol_thr_backward;
+           << "_atol_" << sm_opts.atol_thr_backward
+           << "_";
         return fn.str();
     }
 
