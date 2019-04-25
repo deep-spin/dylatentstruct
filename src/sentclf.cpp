@@ -207,7 +207,6 @@ int main(int argc, char** argv)
     unsigned n_classes = line_count(class_fn.str());
     cout << "number of classes: " << n_classes << endl;
 
-
     dy::ParameterCollection params;
     std::unique_ptr<GCNSentClf> clf(new GCNSentClf(
             params,

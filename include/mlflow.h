@@ -13,6 +13,12 @@
 
 using nlohmann::json;
 
+long milliseconds_since_epoch()
+{
+    auto t = std::chrono::system_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(t).count();
+}
+
 struct MLFlowRun
 {
     std::string hostname;
@@ -52,6 +58,7 @@ struct MLFlowRun
     };
 
     cpr::Url get_url(const std::string& path)
+    const
     {
         std::stringstream url;
         url << "http://" << hostname << ":" << port
@@ -61,6 +68,7 @@ struct MLFlowRun
     }
 
     void set_tag(const std::string& key, const std::string& val)
+    const
     {
         auto payload = json{
             {"run_uuid", run_uuid},
@@ -73,6 +81,7 @@ struct MLFlowRun
     }
 
     void log_parameter(const std::string& key, const std::string& val)
+    const
     {
         auto payload = json{
             {"run_uuid", run_uuid},
@@ -85,6 +94,7 @@ struct MLFlowRun
     }
 
     void log_metric(const std::string& key, const double& val)
+    const
     {
         auto payload = json{
             {"run_uuid", run_uuid},
@@ -97,10 +107,4 @@ struct MLFlowRun
                            cpr::Body{payload.dump()});
     }
 
-private:
-    long milliseconds_since_epoch()
-    {
-        auto t = std::chrono::system_clock::now().time_since_epoch();
-        return std::chrono::duration_cast<std::chrono::milliseconds>(t).count();
-    }
 };

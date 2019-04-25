@@ -1,9 +1,10 @@
 #pragma once
 
-#include <iostream>
 #include <cassert>
+#include <iostream>
 #include <sstream>
 
+#include "sparsemap.h"
 struct BaseOpts
 {
     virtual std::ostream& print(std::ostream& o) const = 0;
@@ -29,124 +30,91 @@ struct TrainOpts : BaseOpts
     virtual void parse(int argc, char** argv)
     {
         int i = 1;
-        while (i < argc)
-        {
+        while (i < argc) {
             std::string arg = argv[i];
-            if (arg == "--test")
-            {
+            if (arg == "--test") {
                 test = true;
                 i += 1;
-            }
-            else if (arg == "--no-override-dy")
-            {
+            } else if (arg == "--no-override-dy") {
                 override_dy = false;
                 i += 1;
-            }
-            else if (arg == "--lr")
-            {
+            } else if (arg == "--lr") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> lr;
                 i += 2;
-            }
-            else if (arg == "--decay")
-            {
+            } else if (arg == "--decay") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> decay;
                 i += 2;
-            }
-            else if (arg == "--patience")
-            {
+            } else if (arg == "--patience") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> patience;
                 i += 2;
-            }
-            else if (arg == "--save-prefix")
-            {
+            } else if (arg == "--save-prefix") {
                 assert(i + 1 < argc);
                 save_prefix = argv[i + 1];
                 i += 2;
-            }
-            else if (arg == "--max-iter")
-            {
+            } else if (arg == "--max-iter") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> max_iter;
                 i += 2;
-            }
-            else if (arg == "--saved-model")
-            {
+            } else if (arg == "--saved-model") {
                 assert(i + 1 < argc);
                 saved_model = argv[i + 1];
                 i += 2;
-            }
-            else if (arg == "--batch-size")
-            {
+            } else if (arg == "--batch-size") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> batch_size;
                 i += 2;
-            }
-            else if (arg == "--mlflow-experiment")
-            {
+            } else if (arg == "--mlflow-experiment") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> mlflow_exp;
                 i += 2;
-            }
-            else if (arg == "--mlflow-name")
-            {
+            } else if (arg == "--mlflow-name") {
                 assert(i + 1 < argc);
                 mlflow_name = argv[i + 1];
                 i += 2;
-            }
-            else
-            {
+            } else {
                 i += 1;
             }
         }
     }
 
-    virtual std::ostream& print(std::ostream& o)
-    const
-    override
+    virtual std::ostream& print(std::ostream& o) const override
     {
-        o <<  (test ? "Test" : "Train") << " mode. "
+        o << (test ? "Test" : "Train") << " mode. "
           << "Arguments:\n"
-          << " Save prefix: " << save_prefix     << '\n'
-          << "   Max. iter: " << max_iter        << '\n'
-          << "  Batch size: " << batch_size      << '\n'
-          << "          LR: " << lr              << '\n'
-          << "       Decay: " << decay           << '\n'
-          << "  MLFlow exp: " << mlflow_exp      << '\n'
-          << "  MLFlow run: " << mlflow_name     << '\n'
-          << "  Model file: " << saved_model     << std::endl;
+          << " Save prefix: " << save_prefix << '\n'
+          << "   Max. iter: " << max_iter << '\n'
+          << "  Batch size: " << batch_size << '\n'
+          << "          LR: " << lr << '\n'
+          << "       Decay: " << decay << '\n'
+          << "  MLFlow exp: " << mlflow_exp << '\n'
+          << "  MLFlow run: " << mlflow_name << '\n'
+          << "  Model file: " << saved_model << std::endl;
 
         return o;
     }
 
-    virtual std::string get_filename()
-    const
-    override
+    virtual std::string get_filename() const override
     {
         std::ostringstream fn;
-        fn << "bs_" << batch_size
-           << "_lr_" << lr
-           << "_decay_" << decay
-           << "_";
+        fn << "bs_" << batch_size << "_lr_" << lr << "_decay_" << decay << "_";
         return fn.str();
     }
-
 };
-
 
 struct GCNOpts : BaseOpts
 {
@@ -159,47 +127,35 @@ struct GCNOpts : BaseOpts
     virtual void parse(int argc, char** argv)
     {
         int i = 1;
-        while (i < argc)
-        {
+        while (i < argc) {
             std::string arg = argv[i];
-            if (arg == "--lstm-layers")
-            {
+            if (arg == "--lstm-layers") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> lstm_layers;
                 i += 2;
-            }
-            else if (arg == "--gcn-layers")
-            {
+            } else if (arg == "--gcn-layers") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> gcn_layers;
                 i += 2;
-            }
-            else if (arg == "--drop")
-            {
+            } else if (arg == "--drop") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> dropout;
                 i += 2;
-            }
-            else if (arg == "--strat")
-            {
+            } else if (arg == "--strat") {
                 assert(i + 1 < argc);
                 strat = argv[i + 1];
                 i += 2;
-            }
-            else if (arg == "--scorer")
-            {
+            } else if (arg == "--scorer") {
                 assert(i + 1 < argc);
                 scorer = argv[i + 1];
                 i += 2;
-            }
-            else
-            {
+            } else {
                 i += 1;
             }
         }
@@ -216,14 +172,11 @@ struct GCNOpts : BaseOpts
         return o;
     }
 
-    virtual std::string get_filename()
-    const
+    virtual std::string get_filename() const
     {
         std::ostringstream fn;
-        fn << "_lstm_" << lstm_layers
-            << "_gcn_" << gcn_layers
-            << "_drop_" << dropout
-            << "_strat_" << strat;
+        fn << "_lstm_" << lstm_layers << "_gcn_" << gcn_layers << "_drop_"
+           << dropout << "_strat_" << strat;
         return fn.str();
     }
 };
@@ -235,17 +188,13 @@ struct ClfOpts : BaseOpts
     virtual void parse(int argc, char** argv)
     {
         int i = 1;
-        while (i < argc)
-        {
+        while (i < argc) {
             std::string arg = argv[i];
-            if (arg == "--dataset")
-            {
+            if (arg == "--dataset") {
                 assert(i + 1 < argc);
                 dataset = argv[i + 1];
                 i += 2;
-            }
-            else
-            {
+            } else {
                 i += 1;
             }
         }
@@ -258,8 +207,7 @@ struct ClfOpts : BaseOpts
         return o;
     }
 
-    virtual std::string get_filename()
-    const
+    virtual std::string get_filename() const
     {
         std::ostringstream fn;
         fn << dataset;
@@ -267,10 +215,14 @@ struct ClfOpts : BaseOpts
     }
 };
 
-
 struct ESIMArgs : public BaseOpts
 {
-    enum class Attn {SOFTMAX, SPARSEMAX, HEAD};
+    enum class Attn
+    {
+        SOFTMAX,
+        SPARSEMAX,
+        HEAD
+    };
     std::string dataset;
     std::string attn_str = "softmax";
     float dropout = 0.5;
@@ -280,47 +232,29 @@ struct ESIMArgs : public BaseOpts
     virtual void parse(int argc, char** argv)
     {
         int i = 1;
-        while (i < argc)
-        {
+        while (i < argc) {
             std::string arg = argv[i];
-            if (arg == "--dataset")
-            {
+            if (arg == "--dataset") {
                 assert(i + 1 < argc);
                 dataset = argv[i + 1];
                 i += 2;
-            }
-            else if (arg == "--attn")
-            {
+            } else if (arg == "--attn") {
                 assert(i + 1 < argc);
                 attn_str = argv[i + 1];
                 i += 2;
-            }
-            else if (arg == "--drop")
-            {
+            } else if (arg == "--drop") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> dropout;
                 i += 2;
-            }
-            else if (arg == "--max-decode-iter")
-            {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> max_decode_iter;
-                i += 2;
-            }
-            else if (arg == "--lstm-layers")
-            {
+            } else if (arg == "--lstm-layers") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> lstm_layers;
                 i += 2;
-            }
-            else
-            {
+            } else {
                 i += 1;
             }
         }
@@ -334,42 +268,110 @@ struct ESIMArgs : public BaseOpts
             return Attn::SPARSEMAX;
         else if (attn_str == "head")
             return Attn::HEAD;
-        else
-        {
+        else {
             std::cerr << "Invalid attention type." << std::endl;
             std::exit(EXIT_FAILURE);
         }
     }
 
-    virtual std::string get_filename()
-    const
-    override
+    virtual std::string get_filename() const override
     {
         std::ostringstream fn;
-        fn << "_ESIM_"
-           << dataset
-           << "_attn_" << attn_str
-           << "_drop_" << dropout
-           << "_decode_" << max_decode_iter;
+        fn << "_ESIM_" << dataset << "_attn_" << attn_str << "_drop_"
+           << dropout;
         return fn.str();
     }
 
-    virtual std::ostream& print(std::ostream& o)
-    const
-    override
+    virtual std::ostream& print(std::ostream& o) const override
     {
         o << " ESIM settings\n"
           << " LSTM layers: " << lstm_layers << '\n'
           << "     Dataset: " << dataset << '\n'
           << "     Dropout: " << dropout << '\n'
-          << " Decode iter: " << max_decode_iter << '\n'
           << "   Attention: " << attn_str << '\n';
         return o;
     }
 };
 
+struct SparseMAPOpts : BaseOpts
+{
+    dynet::SparseMAPOpts sm_opts;
 
-std::ostream& operator << (std::ostream &o, const BaseOpts &opts)
+    virtual void parse(int argc, char** argv)
+    {
+        int i = 1;
+        while (i < argc) {
+            std::string arg = argv[i];
+            if (arg == "--sparsemap-max-iter") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> sm_opts.max_iter;
+                i += 2;
+            } else if (arg == "--sparsemap-eta") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> sm_opts.eta;
+                i += 2;
+            } else if (arg == "--sparsemap-adapt-eta") {
+                sm_opts.adapt_eta = true;
+                i += 1;
+            } else if (arg == "--sparsemap-residual-thr") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> sm_opts.residual_thr;
+                i += 2;
+            } else if (arg == "--sparsemap-max-iter-bw") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> sm_opts.max_iter_backward;
+                i += 2;
+            } else if (arg == "--sparsemap-atol-thr-bw") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> sm_opts.atol_thr_backward;
+                i += 2;
+            } else if (arg == "--sparsemap-max-active-set-iter") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> sm_opts.max_active_set_iter;
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    virtual std::string get_filename() const override
+    {
+        std::ostringstream fn;
+        fn << "sparsemap_max_iter_" << sm_opts.max_iter << "_thr_"
+           << sm_opts.residual_thr << "_bw_" << sm_opts.max_iter_backward
+           << "_atol_" << sm_opts.atol_thr_backward;
+        return fn.str();
+    }
+
+    virtual std::ostream& print(std::ostream& o) const override
+    {
+        o << " SparseMAP settings\n"
+          << "    Max iter: " << sm_opts.max_iter << '\n'
+          << "Residual thr: " << sm_opts.residual_thr << '\n'
+          << "         eta: " << sm_opts.eta << '\n'
+          << "   Adapt eta: " << sm_opts.adapt_eta << '\n'
+          << "BW: max iter: " << sm_opts.max_iter_backward << '\n'
+          << "BW: atol thr: " << sm_opts.atol_thr_backward << '\n'
+          << "Act.set iter: " << sm_opts.max_active_set_iter << '\n';
+        return o;
+    }
+};
+
+std::ostream&
+operator<<(std::ostream& o, const BaseOpts& opts)
 {
     return opts.print(o);
 }
