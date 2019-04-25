@@ -218,8 +218,37 @@ struct ClfOpts : BaseOpts
 
 struct ListOpOpts : public BaseOpts
 {
-    size_t hidden_dim;
-    float dropout;
+    size_t hidden_dim = 100;
+    float dropout = 0.1;
+    std::string tree_str = "gold";
+    size_t self_iter = 5;
+
+    enum class Tree
+    {
+        FLAT,
+        LTR,
+        GOLD,
+        MST,
+        MST_CONSTR
+    };
+
+    Tree get_tree() const
+    {
+        if (tree_str == "flat")
+            return Tree::FLAT;
+        else if (tree_str == "ltr")
+            return Tree::LTR;
+        else if (tree_str == "gold")
+            return Tree::GOLD;
+        else if (tree_str == "mst")
+            return Tree::MST;
+        else if (tree_str == "mst_constr")
+            return Tree::MST_CONSTR;
+        else {
+            std::cerr << "Invalid tree type." << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
+    }
 
     virtual void parse(int argc, char** argv)
     {
@@ -232,11 +261,21 @@ struct ListOpOpts : public BaseOpts
                 std::istringstream vals(val);
                 vals >> hidden_dim;
                 i += 2;
+            } else if (arg == "--self-iter") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> self_iter;
+                i += 2;
             } else if (arg == "--drop") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> dropout;
+                i += 2;
+            } else if (arg == "--tree") {
+                assert(i + 1 < argc);
+                tree_str = argv[i + 1];
                 i += 2;
             } else {
                 i += 1;
@@ -248,6 +287,8 @@ struct ListOpOpts : public BaseOpts
     {
         o << "ListOps task\n"
           << " hidden dim: " << hidden_dim << '\n'
+          << "       tree: " << tree_str << '\n'
+          << "   selfiter: " << self_iter << '\n'
           << "    dropout: " << dropout << '\n';
         return o;
     }
@@ -257,6 +298,8 @@ struct ListOpOpts : public BaseOpts
         std::ostringstream fn;
         fn << "_dim" << hidden_dim
            << "_drop" << dropout
+           << "_tree_" << tree_str
+           << "_selfit" << self_iter
            << "_";
         return fn.str();
     }

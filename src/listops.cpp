@@ -36,6 +36,7 @@ int main(int argc, char** argv)
     dy::ParameterCollection params;
     std::unique_ptr<BaseSentClf> clf =
         std::make_unique<ListOps>(params,
+                                  list_opts.get_tree(),
                                   vocab_size,
                                   list_opts.hidden_dim,
                                   list_opts.hidden_dim,
@@ -56,6 +57,8 @@ int main(int argc, char** argv)
 
     mlflow.log_parameter("hidden_dim", std::to_string(list_opts.hidden_dim));
     mlflow.log_parameter("dropout", std::to_string(list_opts.dropout));
+    mlflow.log_parameter("self_iter", std::to_string(list_opts.self_iter));
+    mlflow.log_parameter("tree", list_opts.tree_str);
     mlflow.log_parameter("fn_prefix", opts.save_prefix);
 
     // tweak filename
