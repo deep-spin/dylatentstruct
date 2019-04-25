@@ -37,6 +37,7 @@ int main(int argc, char** argv)
     std::unique_ptr<BaseSentClf> clf =
         std::make_unique<ListOps>(params,
                                   list_opts.get_tree(),
+                                  list_opts.self_iter,
                                   vocab_size,
                                   list_opts.hidden_dim,
                                   list_opts.hidden_dim,
