@@ -77,14 +77,14 @@ struct BaseEmbedBiLSTMModel : BaseModel
         assert(hidden_dim_ % 2 == 0);
     }
 
-    void
+    virtual void
     set_train_time()
     {
         training_ = true;
         bilstm.set_dropout(dropout_);
     }
 
-    void
+    virtual void
     set_test_time()
     {
         training_ = false;

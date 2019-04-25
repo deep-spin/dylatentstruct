@@ -76,7 +76,7 @@ struct ESIM : public BaseNLI
         }
     }
 
-    virtual Expr2 infer_rnn(Expression X)
+    Expr2 infer_rnn(Expression X)
     {
         unsigned sz;
 
@@ -167,5 +167,19 @@ struct ESIM : public BaseNLI
         }
 
         return out;
+    }
+
+    virtual void
+    set_train_time() override
+    {
+        BaseEmbedBiLSTMModel::set_train_time();
+        bilstm_inf.set_dropout(dropout_p);
+    }
+
+    virtual void
+    set_test_time() override
+    {
+        BaseEmbedBiLSTMModel::set_test_time();
+        bilstm_inf.disable_dropout();
     }
 };
