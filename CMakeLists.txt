@@ -103,11 +103,11 @@ target_compile_options(dylatentstruct PUBLIC
 # add_executable(sentclf src/sentclf.cpp)
 add_executable(esim src/esim.cpp)
 #add_executable(listops src/listops.cpp)
-# add_executable(check_gcn_nondet src/check_gcn_nondet.cpp)
+add_executable(check src/check.cpp)
 # add_executable(mlflowtest src/mlflowtest.cpp)
 
 #target_link_libraries(sentclf PUBLIC dylatentstruct)
 target_link_libraries(esim PUBLIC dylatentstruct)
 #target_link_libraries(listops PUBLIC dylatentstruct)
 #target_link_libraries(mlflowtest PUBLIC dylatentstruct)
-#target_link_libraries(check_gcn_nondet PUBLIC dylatentstruct)
+target_link_libraries(check PUBLIC dylatentstruct)

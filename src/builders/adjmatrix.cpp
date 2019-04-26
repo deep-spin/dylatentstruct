@@ -123,7 +123,9 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     auto u_cpu = dy::sparsemap(scores_cpu, std::move(fg), opts);
 
     std::cout << u_cpu.value() << std::endl;
-    std::abort();
+
+    // turn this into an adjacency matrix
+    //
 
     auto u = dy::to_device(u_cpu, device);
     return u;
