@@ -152,7 +152,7 @@ train(std::unique_ptr<BaseSentClf>& clf,
     float best_valid_acc = 0;
     float last_valid_acc = 0;
 
-    Crayon crayon(out_fn);
+    Crayon crayon(out_fn, mlflow.hostname);
 
     for (unsigned it = 0; it < opts.max_iter; ++it) {
         // shuffle the permutation vector

@@ -74,7 +74,7 @@ main(int argc, char** argv)
     clf->load_embeddings(embed_fn.str());
 
     /* log mlflow run */
-    MLFlowRun mlflow(opts.mlflow_exp);
+    MLFlowRun mlflow(opts.mlflow_exp, opts.mlflow_host);
     mlflow.set_tag("mlflow.runName", opts.mlflow_name);
 
     mlflow.log_parameter("dataset", esim_opts.dataset);

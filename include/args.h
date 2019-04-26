@@ -27,6 +27,7 @@ struct TrainOpts : BaseOpts
 
     int mlflow_exp = -1;
     std::string mlflow_name = "";
+    std::string mlflow_host = "localhost";
 
     virtual void parse(int argc, char** argv)
     {
@@ -87,6 +88,10 @@ struct TrainOpts : BaseOpts
                 assert(i + 1 < argc);
                 mlflow_name = argv[i + 1];
                 i += 2;
+            } else if (arg == "--mlflow-host") {
+                assert(i + 1 < argc);
+                mlflow_host = argv[i + 1];
+                i += 2;
             } else {
                 i += 1;
             }
@@ -102,6 +107,7 @@ struct TrainOpts : BaseOpts
           << "  Batch size: " << batch_size << '\n'
           << "          LR: " << lr << '\n'
           << "       Decay: " << decay << '\n'
+          << " MLFlow host: " << mlflow_host << '\n'
           << "  MLFlow exp: " << mlflow_exp << '\n'
           << "  MLFlow run: " << mlflow_name << '\n'
           << "  Model file: " << saved_model << std::endl;
