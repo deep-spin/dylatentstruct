@@ -52,7 +52,6 @@ add_library(
     include/data.h
 
     include/models/basemodel.h
-    include/models/sentclf_model.h
     include/models/basenli.h
     include/models/esim.h
 
@@ -66,6 +65,8 @@ add_library(
     src/builders/bilstm.cpp
     src/builders/gcn.cpp
     src/builders/biattn.cpp
+    src/builders/adjmatrix.cpp
+    src/factors/FactorTree.cpp
 )
 
 target_link_libraries(dylatentstruct
@@ -99,14 +100,14 @@ target_compile_options(dylatentstruct PUBLIC
     -funroll-loops
     -march=native)
 
-add_executable(sentclf src/sentclf.cpp)
+# add_executable(sentclf src/sentclf.cpp)
 add_executable(esim src/esim.cpp)
-add_executable(listops src/listops.cpp)
+#add_executable(listops src/listops.cpp)
 # add_executable(check_gcn_nondet src/check_gcn_nondet.cpp)
 # add_executable(mlflowtest src/mlflowtest.cpp)
 
-target_link_libraries(sentclf PUBLIC dylatentstruct)
+#target_link_libraries(sentclf PUBLIC dylatentstruct)
 target_link_libraries(esim PUBLIC dylatentstruct)
-target_link_libraries(listops PUBLIC dylatentstruct)
+#target_link_libraries(listops PUBLIC dylatentstruct)
 #target_link_libraries(mlflowtest PUBLIC dylatentstruct)
 #target_link_libraries(check_gcn_nondet PUBLIC dylatentstruct)

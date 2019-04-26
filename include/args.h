@@ -125,42 +125,47 @@ struct TrainOpts : BaseOpts
 
 struct GCNOpts : BaseOpts
 {
-    unsigned lstm_layers = 1;
-    unsigned gcn_layers = 1;
-    double dropout = .1;
-    std::string strat = "corenlp";
-    std::string scorer = "mlp";
+    unsigned layers = 0;
+    std::string tree_str = "gold";
+
+    enum class Tree
+    {
+        FLAT,
+        LTR,
+        GOLD,
+        MST,
+    };
+
+    Tree get_tree() const
+    {
+        if (tree_str == "flat")
+            return Tree::FLAT;
+        else if (tree_str == "ltr")
+            return Tree::LTR;
+        else if (tree_str == "gold")
+            return Tree::GOLD;
+        else if (tree_str == "mst")
+            return Tree::MST;
+        else {
+            std::cerr << "Invalid tree type." << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
+    }
 
     virtual void parse(int argc, char** argv)
     {
         int i = 1;
         while (i < argc) {
             std::string arg = argv[i];
-            if (arg == "--lstm-layers") {
+            if (arg == "--gcn-layers") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
-                vals >> lstm_layers;
+                vals >> layers;
                 i += 2;
-            } else if (arg == "--gcn-layers") {
+            } else if (arg == "--tree") {
                 assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> gcn_layers;
-                i += 2;
-            } else if (arg == "--drop") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> dropout;
-                i += 2;
-            } else if (arg == "--strat") {
-                assert(i + 1 < argc);
-                strat = argv[i + 1];
-                i += 2;
-            } else if (arg == "--scorer") {
-                assert(i + 1 < argc);
-                scorer = argv[i + 1];
+                tree_str = argv[i + 1];
                 i += 2;
             } else {
                 i += 1;
@@ -171,19 +176,16 @@ struct GCNOpts : BaseOpts
     virtual std::ostream& print(std::ostream& o) const
     {
         o << "GCN settins\n";
-        o << " LSTM layers: " << lstm_layers << '\n';
-        o << "  GCN layers: " << gcn_layers << '\n';
-        o << "    strategy: " << strat << '\n';
-        o << "      scorer: " << scorer << '\n';
-        o << "     dropout: " << dropout << '\n';
+        o << "  GCN layers: " << layers << '\n';
+        o << "        tree: " << tree_str << '\n';
         return o;
     }
 
     virtual std::string get_filename() const
     {
         std::ostringstream fn;
-        fn << "_lstm_" << lstm_layers << "_gcn_" << gcn_layers << "_drop_"
-           << dropout << "_strat_" << strat;
+        fn << "_gcn_" << layers
+           << "_strat_" << tree_str;
         return fn.str();
     }
 };

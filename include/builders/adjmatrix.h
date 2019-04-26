@@ -4,96 +4,65 @@
 
 #include <vector>
 
-#include <dynet/model.h>
 #include <dynet/expr.h>
+#include <dynet/model.h>
+
+#include "data.h"
+
+#include "builders/arcscorers.h"
+#include "sparsemap.h"
 
 namespace dy = dynet;
 
 struct TreeAdjacency
 {
     virtual void new_graph(dy::ComputationGraph& cg) = 0;
-    virtual dy::Expression make_adj(
-        const std::vector<dy::Expression>& input,
-        const std::vector<int>& heads
-    ) = 0;
-};
+    virtual dy::Expression make_adj(const std::vector<dy::Expression>& input,
+                                    const Sentence& sent) = 0;
 
+    /* This is so that we can jointly learn two trees with cross-constraints */
+    virtual std::tuple<dy::Expression, dy::Expression> make_adj_pair(
+      const std::vector<dy::Expression>& enc_prem,
+      const std::vector<dy::Expression>& enc_hypo,
+      const Sentence& prem,
+      const Sentence& hypo);
+};
 
 struct FixedAdjacency : TreeAdjacency
 {
     dy::ComputationGraph* cg_;
-    virtual void new_graph(dy::ComputationGraph& cg) override
-    {
-        cg_ = &cg;
-    };
-
-    virtual dy::Expression make_fixed_adj(const std::vector<unsigned>& heads)
-    {
-        unsigned int n = heads.size();
-
-        /* dense
-        std::vector<float> data((1 + n) * (1 + n), 0.0f);
-        for (size_t i = 0; i < n; ++i)
-            data[(1 + n) * (1 + i) + heads[i]] = 1;
-        auto U = dy::input(*cg_, {1 + n, 1 + n}, data);
-        */
-
-        // sparse
-        std::vector<float> data(n, 1.0f);
-        std::vector<unsigned int> ixs(n);
-
-        for (size_t i = 0; i < n; ++i)
-            ixs[i] = (1 + n) * (1 + i) + heads[i];
-
-        // sparse input
-        auto U = dy::input(*cg_, {1 + n, 1 + n}, ixs, data);
-
-        return U;
-    }
+    virtual void new_graph(dy::ComputationGraph& cg) override;
+    virtual dy::Expression make_fixed_adj(const std::vector<unsigned>& heads);
 };
 
 struct FlatAdjacency : FixedAdjacency
 {
-    virtual dy::Expression make_adj(
-        const std::vector<dy::Expression>&,
-        const std::vector<int>& heads)
-    override
-    {
-        size_t n = heads.size() - 1;
-        std::vector<unsigned> nonneg_heads(n, 0);
-        return make_fixed_adj(nonneg_heads);
-    }
+    virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
+                                    const Sentence& sent) override;
 };
 
 struct LtrAdjacency : FixedAdjacency
 {
-    virtual dy::Expression make_adj(
-        const std::vector<dy::Expression>&,
-        const std::vector<int>& heads)
-    override
-    {
-        size_t n = heads.size() - 1;
-        std::vector<unsigned> nonneg_heads;
-        for (size_t k = 1; k < n; ++k)
-            nonneg_heads.push_back(k + 1);
-        nonneg_heads.push_back(0);
-        return make_fixed_adj(nonneg_heads);
-    }
+    virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
+                                    const Sentence& sent) override;
 };
 
 struct CustomAdjacency : FixedAdjacency
 {
-    virtual dy::Expression make_adj(
-        const std::vector<dy::Expression>&,
-        const std::vector<int>& heads)
-    override
-    {
-        std::vector<unsigned> nonneg_heads(heads.begin() + 1, heads.end());
-        return make_fixed_adj(nonneg_heads);
-    }
+    virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
+                                    const Sentence& sent) override;
 };
 
-
-struct LatentAdjacency : TreeAdjacency
+struct MSTAdjacency : TreeAdjacency
 {
+    dynet::SparseMAPOpts opts;
+    MLPScoreBuilder scorer;
+
+    explicit MSTAdjacency(dy::ParameterCollection& params,
+                          const dy::SparseMAPOpts& opts,
+                          unsigned hidden_dim);
+
+    virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
+                                    const Sentence& sent) override;
+    virtual void new_graph(dy::ComputationGraph& cg) override;
 };

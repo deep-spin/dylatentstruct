@@ -101,6 +101,22 @@ struct ESIM : public BaseNLI
         return std::tie(mean_enc, max_enc);
     }
 
+    virtual void new_graph(ComputationGraph& cg)
+    {
+        bilstm.new_graph(cg, training_, true);
+        bilstm_inf.new_graph(cg, training_, true);
+        attn->new_graph(cg, training_);
+    }
+
+    virtual Expr2 syntactic_encode(const NLIPair&,
+                                   const std::vector<dy::Expression>& prem,
+                                   const std::vector<dy::Expression>& hypo)
+    {
+        auto P = dy::concatenate_cols(prem);
+        auto H = dy::concatenate_cols(hypo);
+        return std::forward_as_tuple(P, H);
+    }
+
     virtual vector<Expression> predict_batch(ComputationGraph& cg,
                                              const NLIBatch& batch) override
     {
@@ -112,9 +128,7 @@ struct ESIM : public BaseNLI
         using dy::rectify;
         using dy::transpose;
 
-        bilstm.new_graph(cg, training_, true);
-        bilstm_inf.new_graph(cg, training_, true);
-        attn->new_graph(cg, training_);
+        new_graph(cg);
 
         auto inf_b = parameter(cg, p_inf_b);
         auto inf_W = parameter(cg, p_inf_W);
@@ -129,8 +143,9 @@ struct ESIM : public BaseNLI
             auto enc_prem = embed_ctx_sent(cg, sample.prem),
                  enc_hypo = embed_ctx_sent(cg, sample.hypo);
 
-            auto P = concatenate_cols(enc_prem);
-            auto H = concatenate_cols(enc_hypo);
+
+            Expression P, H;
+            std::tie(P, H) = syntactic_encode(sample, enc_prem, enc_hypo);
 
             // M is prem.size * hypo.size
             auto scores = transpose(P) * H;
