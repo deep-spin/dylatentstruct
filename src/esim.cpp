@@ -55,7 +55,8 @@ main(int argc, char** argv)
     unsigned vocab_size = line_count(vocab_fn.str());
     cout << "vocabulary size: " << vocab_size << endl;
 
-    size_t n_classes = 3;
+    unsigned n_classes = line_count(class_fn.str());
+    cout << "n_classes: " << n_classes << endl;
 
     dy::ParameterCollection params;
 
@@ -105,7 +106,8 @@ main(int argc, char** argv)
     fn << opts.save_prefix
        << "_esim_"
        << "_" << opts.get_filename()
-       << "_" << esim_opts.get_filename();
+       << "_" << esim_opts.get_filename()
+       << "_";
 
     if (is_sparsemap)
         fn << smap_opts.get_filename();
