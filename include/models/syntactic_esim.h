@@ -26,9 +26,10 @@ struct SyntacticESIM : public ESIM
                            bool update_embed = true)
       : ESIM{ params,    vocab_size, embed_dim, hidden_dim, n_classes,
               attn_type, smap_opts,  dropout_p, stacks,     update_embed }
-      , gcn_settings{ hidden_dim, gcn_layers, false }
+      , gcn_settings{ hidden_dim, gcn_layers, /*dense=*/true }
       , gcn{ p, gcn_settings, hidden_dim }
-    {
+      , p_squeeze_W(p.add_parameters({ hidden_dim, 2 * hidden_dim }))
+      , p_squeeze_b(p.add_parameters({ hidden_dim })) {
         if (tree_type == GCNOpts::Tree::LTR)
             tree = std::make_unique<LtrAdjacency>();
         else if (tree_type == GCNOpts::Tree::FLAT)
@@ -50,6 +51,9 @@ struct SyntacticESIM : public ESIM
         ESIM::new_graph(cg);
         gcn.new_graph(cg, training_, true);
         tree->new_graph(cg);
+
+        e_squeeze_W = dy::parameter(cg, p_squeeze_W);
+        e_squeeze_b = dy::parameter(cg, p_squeeze_b);
     }
 
     virtual Expr2 syntactic_encode(
@@ -77,11 +81,17 @@ struct SyntacticESIM : public ESIM
         auto P_enc = gcn.apply(P, Gp);
         auto H_enc = gcn.apply(H, Gh);
 
+        P_enc = dy::affine_transform({e_squeeze_b, e_squeeze_W, P_enc});
+        H_enc = dy::affine_transform({e_squeeze_b, e_squeeze_W, H_enc});
+
         return std::forward_as_tuple(P_enc, H_enc);
     }
+
 
     GCNSettings gcn_settings;
     GCNBuilder gcn;
     std::unique_ptr<TreeAdjacency> tree;
+    dy::Parameter p_squeeze_W, p_squeeze_b;
+    dy::Expression e_squeeze_W, e_squeeze_b;
 };
 

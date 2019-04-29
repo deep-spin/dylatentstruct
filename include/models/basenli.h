@@ -185,8 +185,8 @@ train(std::unique_ptr<BaseNLI>& clf,
                 auto loss = clf->batch_loss(cg, *batch);
                 total_loss += dy::as_scalar(cg.incremental_forward(loss));
                 cg.backward(loss);
-                // clf->save("test.dy");
-                // abort();
+                //clf->save("test.dy");
+                //abort();
                 trainer.update();
             }
         }
