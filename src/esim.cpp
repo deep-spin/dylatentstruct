@@ -82,6 +82,7 @@ main(int argc, char** argv)
                                               esim_opts.get_attn(),
                                               smap_opts.sm_opts,
                                               esim_opts.dropout,
+                                              gcn_opts.dropout,
                                               /* lstm_stacks = */ 1,
                                               /* update_embed = */ true);
 
@@ -119,6 +120,7 @@ main(int argc, char** argv)
     if (is_gcn) {
         mlflow.log_parameter("GCN_layers", std::to_string(gcn_opts.layers));
         mlflow.log_parameter("GCN_tree_type", gcn_opts.tree_str);
+        mlflow.log_parameter("GCN_dropout", std::to_string(gcn_opts.dropout));
     }
 
     if (is_sparsemap) {

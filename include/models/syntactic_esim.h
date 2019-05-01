@@ -22,14 +22,16 @@ struct SyntacticESIM : public ESIM
                            ESIMArgs::Attn attn_type,
                            const dy::SparseMAPOpts& smap_opts,
                            float dropout_p = .5,
+                           float gcn_dropout_p = .1,
                            unsigned stacks = 1,
                            bool update_embed = true)
       : ESIM{ params,    vocab_size, embed_dim, hidden_dim, n_classes,
               attn_type, smap_opts,  dropout_p, stacks,     update_embed }
       , gcn_settings{ hidden_dim, gcn_layers, /*dense=*/true }
       , gcn{ p, gcn_settings, hidden_dim }
-      , p_squeeze_W(p.add_parameters({ hidden_dim, 2 * hidden_dim }))
-      , p_squeeze_b(p.add_parameters({ hidden_dim })) {
+      , p_Ws(p.add_parameters({ hidden_dim, 2 * hidden_dim }))
+      , p_bs(p.add_parameters({ hidden_dim }))
+      {
         if (tree_type == GCNOpts::Tree::LTR)
             tree = std::make_unique<LtrAdjacency>();
         else if (tree_type == GCNOpts::Tree::FLAT)
@@ -43,7 +45,9 @@ struct SyntacticESIM : public ESIM
             std::abort();
         }
 
-        gcn.set_dropout(dropout_p);
+        std::cout << gcn_dropout_p << dropout_p << std::endl;
+
+        gcn.set_dropout(gcn_dropout_p);
     }
 
     virtual void new_graph(dy::ComputationGraph& cg) override
@@ -52,8 +56,8 @@ struct SyntacticESIM : public ESIM
         gcn.new_graph(cg, training_, true);
         tree->new_graph(cg);
 
-        e_squeeze_W = dy::parameter(cg, p_squeeze_W);
-        e_squeeze_b = dy::parameter(cg, p_squeeze_b);
+        Ws = dy::parameter(cg, p_Ws);
+        bs = dy::parameter(cg, p_bs);
     }
 
     virtual Expr2 syntactic_encode(
@@ -81,17 +85,19 @@ struct SyntacticESIM : public ESIM
         auto P_enc = gcn.apply(P, Gp);
         auto H_enc = gcn.apply(H, Gh);
 
-        P_enc = dy::affine_transform({e_squeeze_b, e_squeeze_W, P_enc});
-        H_enc = dy::affine_transform({e_squeeze_b, e_squeeze_W, H_enc});
+        P_enc = dy::rectify(dy::affine_transform({bs, Ws, P_enc}));
+        H_enc = dy::rectify(dy::affine_transform({bs, Ws, H_enc}));
 
-        return std::forward_as_tuple(P_enc, H_enc);
+        //return std::forward_as_tuple(P_enc, H_enc);
+
+        return std::tie(P_enc, H_enc);
     }
 
 
     GCNSettings gcn_settings;
     GCNBuilder gcn;
     std::unique_ptr<TreeAdjacency> tree;
-    dy::Parameter p_squeeze_W, p_squeeze_b;
-    dy::Expression e_squeeze_W, e_squeeze_b;
+    dy::Parameter p_Ws, p_bs;
+    dy::Expression Ws, bs;
 };
 

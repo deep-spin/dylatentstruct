@@ -9,25 +9,29 @@
 
 namespace dy = dynet;
 
-GCNBuilder::GCNBuilder(dy::ParameterCollection& pc, const GCNSettings& settings, unsigned dim_input) :
-    settings(settings),
-    local_pc(pc.add_subcollection("gcn")),
-    e_W_parents(settings.layers),
-    e_b_parents(settings.layers),
-    e_W_children(settings.layers),
-    e_b_children(settings.layers),
-    e_W_self(settings.layers),
-    e_b_self(settings.layers)
+GCNBuilder::GCNBuilder(dy::ParameterCollection& pc,
+                       const GCNSettings& settings,
+                       unsigned dim_input)
+  : settings(settings)
+  , local_pc(pc.add_subcollection("gcn"))
+  , e_W_parents(settings.layers)
+  , e_b_parents(settings.layers)
+  , e_W_children(settings.layers)
+  , e_b_children(settings.layers)
+  , e_W_self(settings.layers)
+  , e_b_self(settings.layers)
 {
     unsigned last = dim_input;
-    for (unsigned i = 0 ; i < settings.layers ; ++ i)
-    {
-        p_W_parents.push_back(local_pc.add_parameters({settings.dim, last}));
-        p_b_parents.push_back(local_pc.add_parameters({settings.dim}, dy::ParameterInitConst(0.f)));
-        p_W_children.push_back(local_pc.add_parameters({settings.dim, last}));
-        p_b_children.push_back(local_pc.add_parameters({settings.dim}, dy::ParameterInitConst(0.f)));
-        p_W_self.push_back(local_pc.add_parameters({settings.dim, last}));
-        p_b_self.push_back(local_pc.add_parameters({settings.dim}, dy::ParameterInitConst(0.f)));
+    for (unsigned i = 0; i < settings.layers; ++i) {
+        p_W_parents.push_back(local_pc.add_parameters({ settings.dim, last }));
+        p_b_parents.push_back(local_pc.add_parameters(
+          { settings.dim }, dy::ParameterInitConst(0.f)));
+        p_W_children.push_back(local_pc.add_parameters({ settings.dim, last }));
+        p_b_children.push_back(local_pc.add_parameters(
+          { settings.dim }, dy::ParameterInitConst(0.f)));
+        p_W_self.push_back(local_pc.add_parameters({ settings.dim, last }));
+        p_b_self.push_back(local_pc.add_parameters(
+          { settings.dim }, dy::ParameterInitConst(0.f)));
 
         if (settings.dense)
             last = settings.dim + last;
@@ -36,29 +40,25 @@ GCNBuilder::GCNBuilder(dy::ParameterCollection& pc, const GCNSettings& settings,
     }
     _output_rows = last;
 
-    std::cerr
-        << "Graph Convolutional Network\n"
-        << " layers: " << settings.layers << "\n"
-        << " dim: " << settings.dim << "\n"
-        << std::endl;
+    std::cerr << "Graph Convolutional Network\n"
+              << " layers: " << settings.layers << "\n"
+              << " dim: " << settings.dim << "\n"
+              << std::endl;
 }
 
-void GCNBuilder::new_graph(dy::ComputationGraph& cg, bool training, bool update)
+void
+GCNBuilder::new_graph(dy::ComputationGraph& cg, bool training, bool update)
 {
     _training = training;
-    for (unsigned i = 0 ; i < settings.layers ; ++ i)
-    {
-        if (update)
-        {
+    for (unsigned i = 0; i < settings.layers; ++i) {
+        if (update) {
             e_W_parents.at(i) = dy::parameter(cg, p_W_parents.at(i));
             e_b_parents.at(i) = dy::parameter(cg, p_b_parents.at(i));
             e_W_children.at(i) = dy::parameter(cg, p_W_children.at(i));
             e_b_children.at(i) = dy::parameter(cg, p_b_children.at(i));
             e_W_self.at(i) = dy::parameter(cg, p_W_self.at(i));
             e_b_self.at(i) = dy::parameter(cg, p_b_self.at(i));
-        }
-        else
-        {
+        } else {
             e_W_parents.at(i) = dy::const_parameter(cg, p_W_parents.at(i));
             e_b_parents.at(i) = dy::const_parameter(cg, p_b_parents.at(i));
             e_W_children.at(i) = dy::const_parameter(cg, p_W_children.at(i));
@@ -69,52 +69,58 @@ void GCNBuilder::new_graph(dy::ComputationGraph& cg, bool training, bool update)
     }
 }
 
-dy::Expression GCNBuilder::apply(const dy::Expression &input, const dy::Expression& graph)
+dy::Expression
+GCNBuilder::apply(const dy::Expression& input, const dy::Expression& graph)
 {
     if (settings.layers == 0)
         return input;
 
     auto t_graph = dy::transpose(graph);
     auto last = input;
-    for (unsigned i = 0u ; i < settings.layers ; ++i)
-    {
-        auto current = dy::colwise_add(e_W_self.at(i) * last,  e_b_self.at(i));
+    for (unsigned i = 0u; i < settings.layers; ++i) {
 
-        auto parents = dy::colwise_add(e_W_parents.at(i) * last, e_b_parents.at(i));
-        current = current + parents * graph;
+        auto current = dy::affine_transform(
+          { e_b_self.at(i), e_W_self.at(i), last });
 
-        auto children = dy::colwise_add(e_W_children.at(i) * last, e_b_children.at(i));
-        current = current + children * t_graph;
+        auto parents = dy::affine_transform(
+          { e_b_parents.at(i), e_W_parents.at(i), last });
 
-        if (dropout_rate > 0.f)
-        {
-            if (_training) {
-                current = dy::dropout(current, dropout_rate);
-            }
-            else {
-                // because of dy bug
-                current = dy::dropout(current, 0.f);
-            }
-        }
+        auto children = dy::affine_transform(
+          { e_b_children.at(i), e_W_children.at(i), last });
 
-        current = dy::tanh(current);
-        //current = dy::rectify(current);
+        auto hid = current + parents * graph + children * t_graph;
+
+        if (_training)
+            hid = dy::dropout(hid, dropout_rate);
+
+        //if (dropout_rate > 0.f) {
+            //if (_training) {
+                //hid = dy::dropout(hid, dropout_rate);
+            //} else {
+                //// because of dy bug
+                //hid = dy::dropout(hid, 0.f);
+            //}
+        //}
+
+        hid = dy::rectify(hid);
 
         if (settings.dense)
-            last = dy::concatenate({current, last});
+            last = dy::concatenate({ hid, last });
         else
-            last = current;
+            last = hid;
     }
 
     return last;
 }
 
-void GCNBuilder::set_dropout(float value)
+void
+GCNBuilder::set_dropout(float value)
 {
     dropout_rate = value;
 }
 
-unsigned GCNBuilder::output_rows() const
+unsigned
+GCNBuilder::output_rows() const
 {
     return _output_rows;
 }

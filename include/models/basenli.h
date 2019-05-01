@@ -165,6 +165,8 @@ train(std::unique_ptr<BaseNLI>& clf,
 
     // dy::SimpleSGDTrainer trainer(clf->p, args.lr);
     dy::AdamTrainer trainer(clf->p, args.lr);
+    //trainer.clip_threshold = 100;
+    //trainer.sparse_updates_enabled = false;
 
     size_t patience = 0;
     float best_valid_acc = 0;

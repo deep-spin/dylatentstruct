@@ -126,6 +126,7 @@ struct TrainOpts : BaseOpts
 struct GCNOpts : BaseOpts
 {
     unsigned layers = 0;
+    float dropout = .1f;
     std::string tree_str = "gold";
 
     enum class Tree
@@ -163,6 +164,12 @@ struct GCNOpts : BaseOpts
                 std::istringstream vals(val);
                 vals >> layers;
                 i += 2;
+            } else if (arg == "--gcn-drop") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dropout;
+                i += 2;
             } else if (arg == "--tree") {
                 assert(i + 1 < argc);
                 tree_str = argv[i + 1];
@@ -177,6 +184,7 @@ struct GCNOpts : BaseOpts
     {
         o << "GCN settins\n";
         o << "  GCN layers: " << layers << '\n';
+        o << " GCN dropout: " << dropout << '\n';
         o << "        tree: " << tree_str << '\n';
         return o;
     }
@@ -185,6 +193,7 @@ struct GCNOpts : BaseOpts
     {
         std::ostringstream fn;
         fn << "_gcn_" << layers
+           << "_gcndrop_" << dropout
            << "_strat_" << tree_str;
         return fn.str();
     }
