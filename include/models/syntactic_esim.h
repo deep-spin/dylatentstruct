@@ -29,7 +29,7 @@ struct SyntacticESIM : public ESIM
               attn_type, smap_opts,  dropout_p, stacks,     update_embed }
       , gcn_settings{ hidden_dim, gcn_layers, /*dense=*/true }
       , gcn{ p, gcn_settings, hidden_dim }
-      , p_Ws(p.add_parameters({ hidden_dim, 2 * hidden_dim }))
+      , p_Ws(p.add_parameters({ hidden_dim, (1 + gcn_layers) * hidden_dim }))
       , p_bs(p.add_parameters({ hidden_dim }))
       {
         if (tree_type == GCNOpts::Tree::LTR)

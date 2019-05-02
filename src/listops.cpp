@@ -34,16 +34,11 @@ int main(int argc, char** argv)
     const unsigned n_classes = 10;
 
     dy::ParameterCollection params;
-    std::unique_ptr<BaseSentClf> clf =
-        std::make_unique<ListOps>(params,
-                                  list_opts.get_tree(),
-                                  list_opts.self_iter,
-                                  vocab_size,
-                                  list_opts.hidden_dim,
-                                  list_opts.hidden_dim,
-                                  n_classes,
-                                  /*lstm_stacks = */1,
-                                  list_opts.dropout);
+    auto clf = ListOps(params,
+                       list_opts.self_iter,
+                       vocab_size,
+                       list_opts.hidden_dim,
+                       n_classes);
 
     /* log mlflow run */
     MLFlowRun mlflow(opts.mlflow_exp);
@@ -68,10 +63,10 @@ int main(int argc, char** argv)
        << opts.get_filename()
        << list_opts.get_filename();
 
+    /*
     if (opts.test)
         test(clf, opts, valid_fn, test_fn);
     else
         train(clf, opts, fn.str(), train_fn, valid_fn, mlflow);
-
-
+    */
 }

@@ -4,59 +4,99 @@
 #include <dynet/rnn.h>
 #include <dynet/tensor-eigen.h>
 #include <dynet/tensor.h>
+#include <dynet/index-tensor.h>
 
 #include <string>
 #include <tuple>
 
 #include "args.h"
-#include "basesent.h"
+#include "basemodel.h"
+#include "data.h"
 #include "builders/adjmatrix.h"
 
 namespace dy = dynet;
 
-struct ListOps : public BaseSentClf
+/* ListOps dependency model:
+ * For every token we learn both a vector AND a matrix */
+struct ListOps : public BaseModel
 {
     explicit ListOps(dy::ParameterCollection& params,
-                     ListOpOpts::Tree tree_type,
-                     size_t self_iter,
+                     unsigned iter,
                      unsigned vocab_size,
                      unsigned embed_dim,
-                     unsigned hidden_dim,
-                     unsigned n_classes,
-                     unsigned stacks = 1,
-                     float dropout = .5)
-        : BaseSentClf(params,
-                      vocab_size,
-                      embed_dim,
-                      hidden_dim,
-                      n_classes,
-                      stacks,
-                      dropout)
-        , self_iter_{ self_iter }
-        , dropout_{ dropout }
-        , p_out_W{ p.add_parameters({ n_classes, 2 * hidden_dim } )}
+                     unsigned n_classes)
+        : BaseModel{ params.add_subcollection("listops") }
+        , iter(iter)
+        , p_emb_v{ p.add_lookup_parameters(vocab_size, {embed_dim}) }
+        , p_emb_M{ p.add_lookup_parameters(vocab_size, {embed_dim, embed_dim}) }
+        , p_out_W{ p.add_parameters({ n_classes, embed_dim }) }
         , p_out_b{ p.add_parameters({ n_classes }) }
-        , p_attn_W{ p.add_parameters({ hidden_dim, hidden_dim } )}
-        , p_attn_b{ p.add_parameters({ hidden_dim }) }
-        , p_comb_W{ p.add_parameters({ hidden_dim, 2 * hidden_dim } )}
-        , p_comb_b{ p.add_parameters({ hidden_dim }) }
-        {
-            if (tree_type == ListOpOpts::Tree::LTR)
-                tree = std::make_unique<LtrAdjacency>();
-            else if (tree_type == ListOpOpts::Tree::FLAT)
-                tree = std::make_unique<FlatAdjacency>();
-            else if (tree_type == ListOpOpts::Tree::GOLD)
-                tree = std::make_unique<CustomAdjacency>();
-            else {
-                std::cerr << "Not implemented";
-                std::abort();
-            }
+    {
+        tree = std::make_unique<CustomAdjacency>();
+    }
 
+    int
+    n_correct(
+        dy::ComputationGraph& cg,
+        const SentBatch& batch)
+    {
+        //set_test_time();
+        auto out_v = predict_batch(cg, batch);
+        auto out_b = dy::concatenate_to_batch(out_v);
+
+        cg.incremental_forward(out_b);
+        auto out = out_b.value();
+        auto pred = dy::as_vector(dy::TensorTools::argmax(out));
+
+        int n_correct = 0;
+        for (size_t i = 0; i < batch.size(); ++i)
+            if (batch[i].target == pred[i])
+                n_correct += 1;
+
+        return n_correct;
+    }
+
+    dy::Expression
+    batch_loss(
+        dy::ComputationGraph& cg,
+        const SentBatch& batch)
+    {
+        //set_train_time();
+        auto out = predict_batch(cg, batch);
+
+        vector<dy::Expression> losses;
+        for (unsigned i = 0; i < batch.size(); ++i) {
+            auto loss = dy::pickneglogsoftmax(out[i], batch[i].target);
+            losses.push_back(loss);
         }
 
-    virtual vector<dy::Expression> predict_batch(dy::ComputationGraph& cg,
-                                             const SentBatch& batch) override
+        return dy::sum(losses);
+    }
+
+    vector<dy::Expression>
+    predict_batch(
+        dy::ComputationGraph& cg,
+        const SentBatch& batch)
     {
+        tree->new_graph(cg);
+
+        auto out_b = dy::parameter(cg, p_out_b);
+        auto out_W = dy::parameter(cg, p_out_W);
+
+        for (auto&& sent : batch) {
+            // i was in the middle of this when I remembered
+            // I don't have the listops data here.
+        }
+    }
+
+    unsigned iter;
+    dy::LookupParameter p_emb_v, p_emb_M;
+    dy::Parameter p_out_W, p_out_b;
+    std::unique_ptr<TreeAdjacency> tree;
+
+};
+
+/*
         bilstm.new_graph(cg, training_, true);
         tree->new_graph(cg);
 
@@ -73,15 +113,12 @@ struct ListOps : public BaseSentClf
 
         for (auto&& sample : batch) {
             auto ctx = embed_ctx_sent(cg, sample.sentence);
-            /* root is a vector of all zeros. We have biases.
             ctx.insert(ctx.begin(), dy::zeros(cg, {hidden_dim_}));
-            */
             auto X = dy::concatenate_cols(ctx);
 
             // cols of G sum to 1
             auto G = tree->make_adj(ctx, sample.sentence.heads);
 
-            /* do self attention with G */
             for (size_t i = 0; i < self_iter_; ++i) {
                 auto attn = dy::affine_transform({ attn_b, attn_W, X });
                 attn = attn * G;
@@ -106,4 +143,5 @@ struct ListOps : public BaseSentClf
     dy::Parameter p_attn_W, p_attn_b;
     dy::Parameter p_comb_W, p_comb_b;
     std::unique_ptr<TreeAdjacency> tree;
-};
+*/
+
