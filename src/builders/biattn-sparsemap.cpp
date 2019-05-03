@@ -320,6 +320,8 @@ HeadHOBuilder::attend(const dynet::Expression scores,
     unsigned n_gp =
       add_grandpa_pairs(fg.get(), prem_sz, hypo_sz, prem_heads, hypo_heads);
 
+    //std::cerr << n_hd << " " << n_cr << " " << n_gp << std::endl;
+
     //fg->Print(std::cout);
     //fg->SetVerbosity(2);
 
@@ -328,16 +330,25 @@ HeadHOBuilder::attend(const dynet::Expression scores,
     auto* cg = scores.pg;
     auto eta_v_hd = ravel(ones_cpu(*cg, { n_hd, 1 }) * e_affinity);
     auto eta_v_cr = ravel(ones_cpu(*cg, { n_cr, 1 }) * e_cross);
+    auto eta_v_gp = ravel(ones_cpu(*cg, { n_gp, 1 }) * e_grandpa);
 
-    dy::Expression eta_v;
-    if (n_gp > 0) {
-        auto eta_v_gp = ravel(ones_cpu(*cg, { n_gp, 1 }) * e_grandpa);
-        eta_v = dy::concatenate({ eta_v_hd, eta_v_cr, eta_v_gp });
-    } else {
-        eta_v = dy::concatenate({ eta_v_hd, eta_v_cr });
+    std::vector<dy::Expression> v_expr;
+    if (n_hd > 0)
+        v_expr.push_back(eta_v_hd);
+
+    if (n_cr > 0)
+        v_expr.push_back(eta_v_cr);
+
+    if (n_gp > 0)
+        v_expr.push_back(eta_v_gp);
+
+    dy::Expression u;
+    if (v_expr.size() > 0) {
+        auto eta_v = dy::concatenate(v_expr);
+        u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
     }
-
-    auto u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
+    else
+        u = dy::sparsemap(eta_u, std::move(fg), opts);
 
     u = dy::reshape(u, d);
 
@@ -382,21 +393,25 @@ HeadHOMatchingBuilder::attend(const dynet::Expression scores,
     auto* cg = scores.pg;
     auto eta_v_hd = ravel(ones_cpu(*cg, { n_hd, 1 }) * e_affinity);
     auto eta_v_cr = ravel(ones_cpu(*cg, { n_cr, 1 }) * e_cross);
+    auto eta_v_gp = ravel(ones_cpu(*cg, { n_gp, 1 }) * e_grandpa);
 
-    dy::Expression eta_v;
-    if (n_gp > 0) {
-        auto eta_v_gp = ravel(ones_cpu(*cg, { n_gp, 1 }) * e_grandpa);
-        eta_v = dy::concatenate({ eta_v_hd, eta_v_cr, eta_v_gp });
-    } else {
-        eta_v = dy::concatenate({ eta_v_hd, eta_v_cr });
+    std::vector<dy::Expression> v_expr;
+    if (n_hd > 0)
+        v_expr.push_back(eta_v_hd);
+
+    if (n_cr > 0)
+        v_expr.push_back(eta_v_cr);
+
+    if (n_gp > 0)
+        v_expr.push_back(eta_v_gp);
+
+    dy::Expression u;
+    if (v_expr.size() > 0) {
+        auto eta_v = dy::concatenate(v_expr);
+        u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
     }
-
-
-    //std::cout << eta_v_hd.value() << std::endl;
-    //std::cout << eta_v_hd.dim() << eta_v_cr.dim() << eta_v_gp.dim()
-              //<< eta_v.dim() << std::endl;
-
-    auto u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
+    else
+        u = dy::sparsemap(eta_u, std::move(fg), opts);
 
     u = dy::reshape(u, d);
     return u;
