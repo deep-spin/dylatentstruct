@@ -315,7 +315,6 @@ HeadHOBuilder::attend(const dynet::Expression scores,
     // PairFactor between (i, j) and (head(i), head(j))
     unsigned n_hd =
       add_head_pairs(fg.get(), prem_sz, hypo_sz, prem_heads, hypo_heads);
-
     unsigned n_cr =
       add_cross_pairs(fg.get(), prem_sz, hypo_sz, prem_heads, hypo_heads);
     unsigned n_gp =
@@ -329,8 +328,14 @@ HeadHOBuilder::attend(const dynet::Expression scores,
     auto* cg = scores.pg;
     auto eta_v_hd = ravel(ones_cpu(*cg, { n_hd, 1 }) * e_affinity);
     auto eta_v_cr = ravel(ones_cpu(*cg, { n_cr, 1 }) * e_cross);
-    auto eta_v_gp = ravel(ones_cpu(*cg, { n_gp, 1 }) * e_grandpa);
-    auto eta_v = dy::concatenate({ eta_v_hd, eta_v_cr, eta_v_gp });
+
+    dy::Expression eta_v;
+    if (n_gp > 0) {
+        auto eta_v_gp = ravel(ones_cpu(*cg, { n_gp, 1 }) * e_grandpa);
+        eta_v = dy::concatenate({ eta_v_hd, eta_v_cr, eta_v_gp });
+    } else {
+        eta_v = dy::concatenate({ eta_v_hd, eta_v_cr });
+    }
 
     auto u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
 
