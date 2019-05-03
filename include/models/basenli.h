@@ -94,7 +94,7 @@ struct BaseNLI : public BaseEmbedBiLSTMModel
             losses.push_back(loss);
         }
 
-        return dy::sum(losses);
+        return dy::average(losses);  // was: sum; this is better
     }
 
     virtual vector<Expression> predict_batch(ComputationGraph& cg,
@@ -163,7 +163,7 @@ train(std::unique_ptr<BaseNLI>& clf,
     vector<vector<NLIBatch>::iterator> train_iter(n_batches);
     std::iota(train_iter.begin(), train_iter.end(), train_data.begin());
 
-    // dy::SimpleSGDTrainer trainer(clf->p, args.lr);
+    //dy::SimpleSGDTrainer trainer(clf->p, args.lr);
     dy::AdamTrainer trainer(clf->p, args.lr);
     //trainer.clip_threshold = 100;
     //trainer.sparse_updates_enabled = false;
@@ -185,7 +185,7 @@ train(std::unique_ptr<BaseNLI>& clf,
             for (auto&& batch : train_iter) {
                 dy::ComputationGraph cg;
                 auto loss = clf->batch_loss(cg, *batch);
-                total_loss += dy::as_scalar(cg.incremental_forward(loss));
+                total_loss += batch->size() * dy::as_scalar(cg.incremental_forward(loss));
                 cg.backward(loss);
                 //clf->save("test.dy");
                 //abort();

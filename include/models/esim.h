@@ -70,6 +70,8 @@ struct ESIM : public BaseNLI
             attn = std::make_unique<BiSparsemaxBuilder>();
         else if (attn_type == ESIMArgs::Attn::HEAD)
             attn = std::make_unique<HeadPreservingBuilder>(p, smap_opts);
+        else if (attn_type == ESIMArgs::Attn::HEADMATCH)
+            attn = std::make_unique<HeadPreservingMatchingBuilder>(p, smap_opts);
         else {
             std::cerr << "Unimplemented attention mechanism." << std::endl;
             std::exit(EXIT_FAILURE);

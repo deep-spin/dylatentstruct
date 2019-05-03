@@ -328,7 +328,8 @@ struct ESIMArgs : public BaseOpts
     {
         SOFTMAX,
         SPARSEMAX,
-        HEAD
+        HEAD,
+        HEADMATCH
     };
     std::string dataset;
     std::string attn_str = "softmax";
@@ -375,6 +376,8 @@ struct ESIMArgs : public BaseOpts
             return Attn::SPARSEMAX;
         else if (attn_str == "head")
             return Attn::HEAD;
+        else if (attn_str == "headmatch")
+            return Attn::HEADMATCH;
         else {
             std::cerr << "Invalid attention type." << std::endl;
             std::exit(EXIT_FAILURE);

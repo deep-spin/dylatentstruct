@@ -83,6 +83,7 @@ MSTAdjacency::MSTAdjacency(dy::ParameterCollection& params,
 void
 MSTAdjacency::new_graph(dy::ComputationGraph& cg)
 {
+    cg_ = &cg;
     scorer.new_graph(cg);
 }
 
@@ -93,15 +94,21 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     auto fg = std::make_unique<AD3::FactorGraph>();
     std::vector<AD3::BinaryVariable*> vars;
     std::vector<std::tuple<int, int>> arcs;
-    size_t sz = enc.size();
+    unsigned sz = enc.size();
 
-    std::cout << "sent size plus root " <<  sz << std::endl;
+    unsigned k = 1;
+
+    std::vector<unsigned> reverse_ixs(sz); // start with a column of zeros
 
     for (size_t m = 1; m < sz; ++m) {
         for (size_t h = 0; h < sz; ++h) {
             if (h != m) {
                 arcs.push_back(std::make_tuple(h, m));
                 vars.push_back(fg->CreateBinaryVariable());
+                reverse_ixs.push_back(k);
+                ++k;
+            } else {
+                reverse_ixs.push_back(0);
             }
         }
     }
@@ -111,21 +118,20 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     fg->DeclareFactor(tree_factor, vars, /*pass_ownership=*/true);
     static_cast<AD3::FactorTree*>(tree_factor)->Initialize(sz, arcs);
 
-    std::cout << "made it here" << std::endl;
     auto scores = scorer.make_potentials(enc);
-    std::cout << "made it here" << std::endl;
     const auto device_name = scores.get_device_name();
     auto* device = dy::get_device_manager()->get_global_device(device_name);
-    auto scores_cpu =
-      dy::to_device(scores, dy::get_device_manager()->get_global_device("CPU"));
+    auto* cpu = dy::get_device_manager()->get_global_device("CPU");
+    auto scores_cpu = dy::to_device(scores, cpu);
 
-    fg->SetVerbosity(10);
+    //fg->SetVerbosity(10);
     auto u_cpu = dy::sparsemap(scores_cpu, std::move(fg), opts);
+    u_cpu = dy::reshape(u_cpu, { u_cpu.dim()[1] });
 
-    std::cout << u_cpu.value() << std::endl;
-
-    // turn this into an adjacency matrix
-    //
+    auto zero = dy::input(*cg_, 0.0, cpu);
+    u_cpu = dy::concatenate({ zero, u_cpu });
+    u_cpu = dy::select_rows(u_cpu, reverse_ixs);
+    u_cpu = dy::reshape(u_cpu, {sz, sz});
 
     auto u = dy::to_device(u_cpu, device);
     return u;

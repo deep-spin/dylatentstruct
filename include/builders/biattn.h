@@ -34,7 +34,29 @@ struct BiSparsemaxBuilder : BiAttentionBuilder
       const NLIPair& sample);
 };
 
-struct HeadPreservingBuilder : BiAttentionBuilder
+struct SymmBiAttnBuilder : BiAttentionBuilder
+{
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads) = 0;
+
+    virtual std::tuple<dynet::Expression, dynet::Expression> apply(
+      const dynet::Expression& scores,
+      const NLIPair& sample);
+};
+
+struct IndepBiAttnBuilder : BiAttentionBuilder
+{
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads) = 0;
+
+    virtual std::tuple<dynet::Expression, dynet::Expression> apply(
+      const dynet::Expression& scores,
+      const NLIPair& sample);
+};
+
+struct HeadPreservingBuilder : IndepBiAttnBuilder
 {
 
     dynet::ParameterCollection p;
@@ -48,11 +70,26 @@ struct HeadPreservingBuilder : BiAttentionBuilder
 
     virtual void new_graph(dynet::ComputationGraph& cg, bool training);
 
-    dynet::Expression attend(const dynet::Expression scores,
-                             const std::vector<int>& prem_heads,
-                             const std::vector<int>& hypo_heads);
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads);
+};
 
-    virtual std::tuple<dynet::Expression, dynet::Expression> apply(
-      const dynet::Expression& scores,
-      const NLIPair& sample);
+struct HeadPreservingMatchingBuilder : SymmBiAttnBuilder
+{
+
+    dynet::ParameterCollection p;
+
+    dynet::Parameter p_affinity;
+    dynet::Expression e_affinity;
+    dynet::SparseMAPOpts opts;
+
+    explicit HeadPreservingMatchingBuilder(dynet::ParameterCollection& params,
+                                           const dynet::SparseMAPOpts& opts);
+
+    virtual void new_graph(dynet::ComputationGraph& cg, bool training);
+
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads);
 };

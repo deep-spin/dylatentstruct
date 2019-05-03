@@ -55,6 +55,7 @@ struct CustomAdjacency : FixedAdjacency
 
 struct MSTAdjacency : TreeAdjacency
 {
+    dy::ComputationGraph* cg_;
     dynet::SparseMAPOpts opts;
     MLPScoreBuilder scorer;
 

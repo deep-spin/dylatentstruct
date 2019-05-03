@@ -1,5 +1,5 @@
-#pragma once
 
+#pragma once
 #include <dynet/expr.h>
 #include <dynet/model.h>
 
@@ -93,26 +93,21 @@ struct MLPScoreBuilder : public ArcScoreBuilder
         size_t sz = enc.size();
         std::vector<dy::Expression> T_hed, T_mod, T_feat;
 
-        std::cout << "a" << std::endl;
         // first head is a vector of all 0s.
         for (size_t h = 0; h < sz; ++h)
-            T_hed.push_back(U_hed * enc[h] + b);
-
-        std::cout << "b" << std::endl;
+            T_hed.push_back(dy::affine_transform({ b, U_hed, enc[h] }));
+            //T_hed.push_back(U_hed * enc[h] + b);
 
         for (size_t m = 1; m < sz; ++m)
+            //T_mod.push_back(dy::affine_transform({ U_mod, enc[m] }));
             T_mod.push_back(U_mod * enc[m]);
-        std::cout << "c" << std::endl;
 
         for (size_t m = 1; m < sz; ++m)
             for (size_t h = 0; h < sz; ++h)
                 if (h != m)
                     T_feat.push_back(T_hed.at(h) + T_mod.at(m - 1)); // arc m->h
 
-        std::cout << "d" << std::endl;
-
         auto TF = dy::concatenate_cols(T_feat);
-        std::cout << "e" << std::endl;
         auto s = v * dy::tanh(TF);
         return s;
 

@@ -45,26 +45,11 @@ add_subdirectory(opt)
 add_library(
     dylatentstruct
 
-    include/args.h
-    include/crayon.h
-    include/mlflow.h
-    include/utils.h
-    include/data.h
-
-    include/models/basemodel.h
-    include/models/basenli.h
-    include/models/esim.h
-
-    include/builders/adjmatrix.h
-    include/builders/arcscorers.h
-    include/builders/bilstm.h
-    include/builders/gcn.h
-    include/builders/biattn.h
-
     src/data.cpp
     src/builders/bilstm.cpp
     src/builders/gcn.cpp
     src/builders/biattn.cpp
+    src/builders/biattn-sparsemap.cpp
     src/builders/adjmatrix.cpp
     src/factors/FactorTree.cpp
 )
@@ -76,6 +61,7 @@ target_link_libraries(dylatentstruct
     Dynet::dynet
     nlohmann_json::nlohmann_json
     cpr
+    lap
 )
 
 target_include_directories(
@@ -110,4 +96,4 @@ add_executable(check src/check.cpp)
 target_link_libraries(esim PUBLIC dylatentstruct)
 #target_link_libraries(listops PUBLIC dylatentstruct)
 #target_link_libraries(mlflowtest PUBLIC dylatentstruct)
-target_link_libraries(check PUBLIC dylatentstruct)
+target_link_libraries(check PUBLIC lap)
