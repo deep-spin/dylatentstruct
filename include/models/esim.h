@@ -71,7 +71,12 @@ struct ESIM : public BaseNLI
         else if (attn_type == ESIMArgs::Attn::HEAD)
             attn = std::make_unique<HeadPreservingBuilder>(p, smap_opts);
         else if (attn_type == ESIMArgs::Attn::HEADMATCH)
-            attn = std::make_unique<HeadPreservingMatchingBuilder>(p, smap_opts);
+            attn =
+              std::make_unique<HeadPreservingMatchingBuilder>(p, smap_opts);
+        else if (attn_type == ESIMArgs::Attn::HEADHO)
+            attn = std::make_unique<HeadHOBuilder>(p, smap_opts);
+        else if (attn_type == ESIMArgs::Attn::HEADMATCHHO)
+            attn = std::make_unique<HeadHOMatchingBuilder>(p, smap_opts);
         else {
             std::cerr << "Unimplemented attention mechanism." << std::endl;
             std::exit(EXIT_FAILURE);
@@ -145,7 +150,6 @@ struct ESIM : public BaseNLI
             auto enc_prem = embed_ctx_sent(cg, sample.prem),
                  enc_hypo = embed_ctx_sent(cg, sample.hypo);
 
-
             Expression P, H;
             std::tie(P, H) = syntactic_encode(sample, enc_prem, enc_hypo);
 
@@ -186,15 +190,13 @@ struct ESIM : public BaseNLI
         return out;
     }
 
-    virtual void
-    set_train_time() override
+    virtual void set_train_time() override
     {
         BaseEmbedBiLSTMModel::set_train_time();
         bilstm_inf.set_dropout(dropout_p);
     }
 
-    virtual void
-    set_test_time() override
+    virtual void set_test_time() override
     {
         BaseEmbedBiLSTMModel::set_test_time();
         bilstm_inf.disable_dropout();

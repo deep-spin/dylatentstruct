@@ -93,3 +93,33 @@ struct HeadPreservingMatchingBuilder : SymmBiAttnBuilder
                                      const std::vector<int>& prem_heads,
                                      const std::vector<int>& hypo_heads);
 };
+
+struct HeadHOBuilder : HeadPreservingBuilder
+{
+
+    dynet::Parameter  p_cross, p_grandpa;
+    dynet::Expression e_cross, e_grandpa;
+
+    explicit HeadHOBuilder(dynet::ParameterCollection& params,
+                           const dynet::SparseMAPOpts& opts);
+
+    virtual void new_graph(dynet::ComputationGraph& cg, bool training);
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads);
+};
+
+struct HeadHOMatchingBuilder : HeadPreservingMatchingBuilder
+{
+
+    dynet::Parameter  p_cross, p_grandpa;
+    dynet::Expression e_cross, e_grandpa;
+
+    explicit HeadHOMatchingBuilder(dynet::ParameterCollection& params,
+                                   const dynet::SparseMAPOpts& opts);
+
+    virtual void new_graph(dynet::ComputationGraph& cg, bool training);
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads);
+};

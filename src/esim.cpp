@@ -33,9 +33,8 @@ main(int argc, char** argv)
     smap_opts.parse(argc, argv);
 
     bool is_gcn = gcn_opts.layers > 0;
-    bool is_sparsemap = ((esim_opts.get_attn() == ESIMArgs::Attn::HEAD) || \
-                         (esim_opts.get_attn() == ESIMArgs::Attn::HEADMATCH) || \
-                         (gcn_opts.get_tree() == GCNOpts::Tree::MST));
+    bool is_sparsemap = (esim_opts.is_sparsemap() ||
+                         gcn_opts.get_tree() == GCNOpts::Tree::MST);
 
     if (opts.override_dy) {
         dyparams.random_seed = 42;

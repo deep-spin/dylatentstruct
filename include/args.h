@@ -329,13 +329,25 @@ struct ESIMArgs : public BaseOpts
         SOFTMAX,
         SPARSEMAX,
         HEAD,
-        HEADMATCH
+        HEADMATCH,
+        HEADHO,
+        HEADMATCHHO
     };
+
     std::string dataset;
     std::string attn_str = "softmax";
     float dropout = 0.5;
     int max_decode_iter;
     int lstm_layers;
+
+    bool is_sparsemap()
+    {
+        auto attn = get_attn();
+        return (attn == Attn::HEAD ||
+                attn == Attn::HEADMATCH ||
+                attn == Attn::HEADHO ||
+                attn == Attn::HEADMATCHHO);
+    }
 
     virtual void parse(int argc, char** argv)
     {
@@ -378,6 +390,10 @@ struct ESIMArgs : public BaseOpts
             return Attn::HEAD;
         else if (attn_str == "headmatch")
             return Attn::HEADMATCH;
+        else if (attn_str == "head-ho")
+            return Attn::HEADHO;
+        else if (attn_str == "headmatch-ho")
+            return Attn::HEADMATCHHO;
         else {
             std::cerr << "Invalid attention type." << std::endl;
             std::exit(EXIT_FAILURE);
