@@ -1,18 +1,18 @@
 #pragma once
 
+#include <dynet/index-tensor.h>
 #include <dynet/lstm.h>
 #include <dynet/rnn.h>
 #include <dynet/tensor-eigen.h>
 #include <dynet/tensor.h>
-#include <dynet/index-tensor.h>
 
 #include <string>
 #include <tuple>
 
 #include "args.h"
 #include "basemodel.h"
-#include "data.h"
 #include "builders/adjmatrix.h"
+#include "data.h"
 
 namespace dy = dynet;
 
@@ -21,26 +21,34 @@ namespace dy = dynet;
 struct ListOps : public BaseModel
 {
     explicit ListOps(dy::ParameterCollection& params,
+                     ListOpOpts::Tree tree_type,
                      unsigned iter,
                      unsigned vocab_size,
                      unsigned embed_dim,
-                     unsigned n_classes)
-        : BaseModel{ params.add_subcollection("listops") }
-        , iter(iter)
-        , p_emb_v{ p.add_lookup_parameters(vocab_size, {embed_dim}) }
-        , p_emb_M{ p.add_lookup_parameters(vocab_size, {embed_dim, embed_dim}) }
-        , p_out_W{ p.add_parameters({ n_classes, embed_dim }) }
-        , p_out_b{ p.add_parameters({ n_classes }) }
+                     unsigned n_classes,
+                     const dy::SparseMAPOpts& smap_opts)
+      : BaseModel{ params.add_subcollection("listops") }
+      , iter{ iter }
+      , embed_dim{ embed_dim }
+      , p_emb_v{ p.add_lookup_parameters(vocab_size, { embed_dim }) }
+      , p_emb_M{ p.add_lookup_parameters(vocab_size, { embed_dim, embed_dim }) }
+      , p_gV{ p.add_parameters({ embed_dim, embed_dim }) }
+      , p_gW{ p.add_parameters({ embed_dim, embed_dim }) }
+      , p_gb{ p.add_parameters({ embed_dim }) }
+      , p_out_W{ p.add_parameters({ n_classes, embed_dim }) }
+      , p_out_b{ p.add_parameters({ n_classes }) }
     {
-        tree = std::make_unique<CustomAdjacency>();
+        if (tree_type == ListOpOpts::Tree::GOLD)
+            tree = std::make_unique<CustomAdjacency>();
+        else if (tree_type == ListOpOpts::Tree::MST)
+            tree = std::make_unique<MSTAdjacency>(p, smap_opts, embed_dim);
+        else if (tree_type == ListOpOpts::Tree::MST_LSTM)
+            tree = std::make_unique<MSTLSTMAdjacency>(p, smap_opts, embed_dim);
     }
 
-    int
-    n_correct(
-        dy::ComputationGraph& cg,
-        const SentBatch& batch)
+    int n_correct(dy::ComputationGraph& cg, const SentBatch& batch)
     {
-        //set_test_time();
+        // set_test_time();
         auto out_v = predict_batch(cg, batch);
         auto out_b = dy::concatenate_to_batch(out_v);
 
@@ -56,12 +64,9 @@ struct ListOps : public BaseModel
         return n_correct;
     }
 
-    dy::Expression
-    batch_loss(
-        dy::ComputationGraph& cg,
-        const SentBatch& batch)
+    dy::Expression batch_loss(dy::ComputationGraph& cg, const SentBatch& batch)
     {
-        //set_train_time();
+        // set_train_time();
         auto out = predict_batch(cg, batch);
 
         vector<dy::Expression> losses;
@@ -70,78 +75,80 @@ struct ListOps : public BaseModel
             losses.push_back(loss);
         }
 
-        return dy::sum(losses);
+        return dy::average(losses);
     }
 
-    vector<dy::Expression>
-    predict_batch(
-        dy::ComputationGraph& cg,
-        const SentBatch& batch)
+    dy::Expression predict_sentence(dy::ComputationGraph& cg,
+                                    const Sentence& sent)
+    {
+        size_t sz = sent.size();
+
+        std::vector<dy::Expression> emb_M(sz), emb_v(sz);
+
+        /* fetch embedding vectors and matrices */
+        for (size_t i = 0; i < sz; ++i) {
+            emb_M.at(i) = dy::lookup(cg, p_emb_M, sent.word_ixs.at(i));
+            emb_v.at(i) = dy::lookup(cg, p_emb_v, sent.word_ixs.at(i));
+        }
+
+        auto M = dy::concatenate_to_batch(emb_M);
+
+        /* get adjacency matrix */
+        auto G = tree->make_adj(emb_v, sent);
+        auto Gt = dy::transpose(G);
+
+        auto status = dy::concatenate_cols(emb_v);
+
+        for (size_t it = 0; it < iter; ++it) {
+            auto input = status * Gt;
+
+            /* batch matvec */
+            input = dy::reshape(input, dy::Dim({ embed_dim }, sz));
+            auto out = dy::reshape(dy::tanh(M * input), status.dim());
+
+            // status = 0.5 * status + 0.5 * out;
+
+            // compute a gate
+            auto gate = dy::logistic(
+              dy::affine_transform({ e_gb, e_gW, status, e_gV, out }));
+
+            status = dy::cmult(gate, status) + dy::cmult(1 - gate,  out);
+        }
+
+        auto root = dy::pick(status, /* first elem */ 0u, /* along cols */ 1u);
+
+        return dy::affine_transform({ e_out_b, e_out_W, root });
+    }
+
+    vector<dy::Expression> predict_batch(dy::ComputationGraph& cg,
+                                         const SentBatch& batch)
     {
         tree->new_graph(cg);
+        e_out_b = dy::parameter(cg, p_out_b);
+        e_out_W = dy::parameter(cg, p_out_W);
+        // gate params
+        e_gb = dy::parameter(cg, p_gb);
+        e_gV = dy::parameter(cg, p_gV);
+        e_gW = dy::parameter(cg, p_gW);
 
-        auto out_b = dy::parameter(cg, p_out_b);
-        auto out_W = dy::parameter(cg, p_out_W);
+        std::vector<dy::Expression> out;
 
-        for (auto&& sent : batch) {
-            // i was in the middle of this when I remembered
-            // I don't have the listops data here.
+        for (auto&& s : batch) {
+            out.push_back(predict_sentence(cg, s.sentence));
         }
-    }
 
-    unsigned iter;
-    dy::LookupParameter p_emb_v, p_emb_M;
-    dy::Parameter p_out_W, p_out_b;
-    std::unique_ptr<TreeAdjacency> tree;
-
-};
-
-/*
-        bilstm.new_graph(cg, training_, true);
-        tree->new_graph(cg);
-
-        const auto d_COLS = 1u;
-
-        auto out_b = dy::parameter(cg, p_out_b);
-        auto out_W = dy::parameter(cg, p_out_W);
-        auto attn_b = dy::parameter(cg, p_attn_b);
-        auto attn_W = dy::parameter(cg, p_attn_W);
-        auto comb_b = dy::parameter(cg, p_comb_b);
-        auto comb_W = dy::parameter(cg, p_comb_W);
-
-        vector<dy::Expression> out;
-
-        for (auto&& sample : batch) {
-            auto ctx = embed_ctx_sent(cg, sample.sentence);
-            ctx.insert(ctx.begin(), dy::zeros(cg, {hidden_dim_}));
-            auto X = dy::concatenate_cols(ctx);
-
-            // cols of G sum to 1
-            auto G = tree->make_adj(ctx, sample.sentence.heads);
-
-            for (size_t i = 0; i < self_iter_; ++i) {
-                auto attn = dy::affine_transform({ attn_b, attn_W, X });
-                attn = attn * G;
-                attn = dy::concatenate({ X, attn }); // rows
-                X = dy::affine_transform({ comb_b, comb_W, attn });
-                X = dy::rectify(X);
-            }
-
-            auto hid = dy::concatenate({
-                    dy::mean_dim(X, { d_COLS }),
-                    dy::max_dim(X, d_COLS) });
-
-            hid = dy::affine_transform({ out_b, out_W, hid });
-            out.push_back(hid);
-        }
         return out;
     }
 
-    size_t self_iter_;
-    float dropout_;
+    unsigned iter;
+    unsigned embed_dim;
+    dy::LookupParameter p_emb_v, p_emb_M;
+    dy::Parameter p_gV, p_gW, p_gb;
     dy::Parameter p_out_W, p_out_b;
-    dy::Parameter p_attn_W, p_attn_b;
-    dy::Parameter p_comb_W, p_comb_b;
     std::unique_ptr<TreeAdjacency> tree;
-*/
+
+  private:
+    dy::Expression e_out_W, e_out_b;
+    dy::Expression e_gV, e_gW, e_gb;
+};
 

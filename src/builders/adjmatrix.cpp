@@ -2,6 +2,33 @@
 #include "factors/FactorTree.h"
 #include <dynet/devices.h>
 
+#include "layers/arcs-to-adj.h"
+
+dy::Expression
+make_fixed_adj(dy::ComputationGraph& cg, const std::vector<unsigned>& heads)
+{
+    unsigned int n = heads.size();
+
+    /* dense
+    std::vector<float> data((1 + n) * (1 + n), 0.0f);
+    for (size_t i = 0; i < n; ++i)
+        data[(1 + n) * (1 + i) + heads[i]] = 1;
+    auto U = dy::input(*cg_, {1 + n, 1 + n}, data);
+    */
+
+    // sparse
+    std::vector<float> data(n, 1.0f);
+    std::vector<unsigned int> ixs(n);
+
+    for (size_t i = 0; i < n; ++i)
+        ixs[i] = (1 + n) * (1 + i) + heads[i];
+
+    // sparse input
+    auto U = dy::input(cg, { 1 + n, 1 + n }, ixs, data);
+
+    return U;
+}
+
 std::tuple<dy::Expression, dy::Expression>
 TreeAdjacency::make_adj_pair(const std::vector<dy::Expression>& enc_prem,
                              const std::vector<dy::Expression>& enc_hypo,
@@ -22,26 +49,7 @@ FixedAdjacency::new_graph(dy::ComputationGraph& cg)
 dy::Expression
 FixedAdjacency::make_fixed_adj(const std::vector<unsigned>& heads)
 {
-    unsigned int n = heads.size();
-
-    /* dense
-    std::vector<float> data((1 + n) * (1 + n), 0.0f);
-    for (size_t i = 0; i < n; ++i)
-        data[(1 + n) * (1 + i) + heads[i]] = 1;
-    auto U = dy::input(*cg_, {1 + n, 1 + n}, data);
-    */
-
-    // sparse
-    std::vector<float> data(n, 1.0f);
-    std::vector<unsigned int> ixs(n);
-
-    for (size_t i = 0; i < n; ++i)
-        ixs[i] = (1 + n) * (1 + i) + heads[i];
-
-    // sparse input
-    auto U = dy::input(*cg_, { 1 + n, 1 + n }, ixs, data);
-
-    return U;
+    return ::make_fixed_adj(*cg_, heads);
 }
 
 dy::Expression
@@ -96,6 +104,11 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     std::vector<std::tuple<int, int>> arcs;
     unsigned sz = enc.size();
 
+    if (sz > 385) { // 99th percentile: use flat
+        std::vector<unsigned> nonneg_heads(sz - 1, 0);
+        return ::make_fixed_adj(*cg_, nonneg_heads);
+    }
+
     unsigned k = 1;
 
     std::vector<unsigned> reverse_ixs(sz); // start with a column of zeros
@@ -124,15 +137,57 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     auto* cpu = dy::get_device_manager()->get_global_device("CPU");
     auto scores_cpu = dy::to_device(scores, cpu);
 
-    //fg->SetVerbosity(10);
+    // fg->SetVerbosity(10);
     auto u_cpu = dy::sparsemap(scores_cpu, std::move(fg), opts);
-    u_cpu = dy::reshape(u_cpu, { u_cpu.dim()[1] });
+    u_cpu = dy::arcs_to_adj(u_cpu, sz);
 
+    /*
+    //u_cpu = dy::reshape(u_cpu, { u_cpu.dim()[1] });
     auto zero = dy::input(*cg_, 0.0, cpu);
-    u_cpu = dy::concatenate({ zero, u_cpu });
-    u_cpu = dy::select_rows(u_cpu, reverse_ixs);
-    u_cpu = dy::reshape(u_cpu, {sz, sz});
+    auto u_cpu_ = dy::concatenate({ zero, u_cpu });
+    u_cpu_ = dy::select_rows(u_cpu_, reverse_ixs);
+    u_cpu_ = dy::reshape(u_cpu_, {sz, sz});
+
+    std::cout << u_cpu_.dim() << std::endl;
+    std::cout << u_cpu_.value() << std::endl;
+    std::cout << sz << std::endl << std::endl;;
+
+    auto f = dy::arcs_to_adj(u_cpu, sz);
+    std::cout << f.dim() << std::endl;
+    std::cout << f.value() << std::endl;
+
+    std::cout << u_cpu_.value() << std::endl;
+    std::abort();
+    */
 
     auto u = dy::to_device(u_cpu, device);
     return u;
 }
+
+MSTLSTMAdjacency::MSTLSTMAdjacency(dy::ParameterCollection& params,
+                                   const dy::SparseMAPOpts& opts,
+                                   unsigned hidden_dim)
+  : MSTAdjacency{ params, opts, hidden_dim }
+  , lstm{ /*layers=*/1, hidden_dim, hidden_dim, params }
+{}
+
+void
+MSTLSTMAdjacency::new_graph(dy::ComputationGraph& cg)
+{
+    MSTAdjacency::new_graph(cg);
+    lstm.new_graph(cg, /*update=*/true);
+}
+
+dy::Expression
+MSTLSTMAdjacency::make_adj(const std::vector<dy::Expression>& enc,
+                           const Sentence& sentence)
+{
+    lstm.start_new_sequence();
+    auto sz = enc.size();
+    std::vector<dy::Expression> lstm_out(sz);
+    for (auto i = 0u; i < sz; ++i)
+        lstm_out.at(i) = lstm.add_input(enc.at(i));
+
+    return MSTAdjacency::make_adj(lstm_out, sentence);
+}
+

@@ -6,6 +6,7 @@
 
 #include <dynet/expr.h>
 #include <dynet/model.h>
+#include <dynet/lstm.h>
 
 #include "data.h"
 
@@ -62,6 +63,21 @@ struct MSTAdjacency : TreeAdjacency
     explicit MSTAdjacency(dy::ParameterCollection& params,
                           const dy::SparseMAPOpts& opts,
                           unsigned hidden_dim);
+
+    virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
+                                    const Sentence& sent) override;
+    virtual void new_graph(dy::ComputationGraph& cg) override;
+};
+
+
+struct MSTLSTMAdjacency : MSTAdjacency
+{
+
+    dy::VanillaLSTMBuilder lstm;
+
+    explicit MSTLSTMAdjacency(dy::ParameterCollection& params,
+                              const dy::SparseMAPOpts& opts,
+                              unsigned hidden_dim);
 
     virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
                                     const Sentence& sent) override;

@@ -246,6 +246,7 @@ struct ListOpOpts : public BaseOpts
         LTR,
         GOLD,
         MST,
+        MST_LSTM,
         MST_CONSTR
     };
 
@@ -259,6 +260,8 @@ struct ListOpOpts : public BaseOpts
             return Tree::GOLD;
         else if (tree_str == "mst")
             return Tree::MST;
+        else if (tree_str == "mst-lstm")
+            return Tree::MST_LSTM;
         else if (tree_str == "mst_constr")
             return Tree::MST_CONSTR;
         else {

@@ -52,6 +52,7 @@ add_library(
     src/builders/biattn-sparsemap.cpp
     src/builders/adjmatrix.cpp
     src/factors/FactorTree.cpp
+    src/layers/arcs-to-adj.cpp
 )
 
 target_link_libraries(dylatentstruct
@@ -88,12 +89,14 @@ target_compile_options(dylatentstruct PUBLIC
 
 # add_executable(sentclf src/sentclf.cpp)
 add_executable(esim src/esim.cpp)
-#add_executable(listops src/listops.cpp)
+add_executable(listops src/listops.cpp)
 add_executable(check src/check.cpp)
+add_executable(test-arcs-to-adj src/test-arcs-to-adj.cpp)
 # add_executable(mlflowtest src/mlflowtest.cpp)
 
 #target_link_libraries(sentclf PUBLIC dylatentstruct)
 target_link_libraries(esim PUBLIC dylatentstruct)
-#target_link_libraries(listops PUBLIC dylatentstruct)
+target_link_libraries(listops PUBLIC dylatentstruct)
 #target_link_libraries(mlflowtest PUBLIC dylatentstruct)
+target_link_libraries(test-arcs-to-adj PUBLIC dylatentstruct)
 target_link_libraries(check PUBLIC lap)
