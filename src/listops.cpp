@@ -72,8 +72,8 @@ train(ListOps& clf,
                 cg.backward(loss);
                 //clf.save("test.dy");
                 //abort();
-                trainer.update();
             }
+
         }
 
         float valid_acc;
@@ -141,7 +141,8 @@ int main(int argc, char** argv)
     SparseMAPOpts smap_opts;
     smap_opts.parse(argc, argv);
 
-    bool is_sparsemap = list_opts.get_tree() == ListOpOpts::Tree::MST;
+    bool is_sparsemap = (list_opts.get_tree() == ListOpOpts::Tree::MST
+                         || list_opts.get_tree() == ListOpOpts::Tree::MST_LSTM);
 
     if (is_sparsemap)
         std::cout << smap_opts << std::endl;

@@ -135,9 +135,10 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     const auto device_name = scores.get_device_name();
     auto* device = dy::get_device_manager()->get_global_device(device_name);
     auto* cpu = dy::get_device_manager()->get_global_device("CPU");
-    auto scores_cpu = dy::to_device(scores, cpu);
+    auto scores_cpu_matrix = dy::to_device(scores, cpu);
+    auto scores_cpu = dy::adj_to_arcs(scores_cpu_matrix);
 
-    // fg->SetVerbosity(10);
+    //fg->SetVerbosity(10);
     auto u_cpu = dy::sparsemap(scores_cpu, std::move(fg), opts);
     u_cpu = dy::arcs_to_adj(u_cpu, sz);
 

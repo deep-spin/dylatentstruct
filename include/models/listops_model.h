@@ -91,22 +91,19 @@ struct ListOps : public BaseModel
             emb_v.at(i) = dy::lookup(cg, p_emb_v, sent.word_ixs.at(i));
         }
 
-        auto M = dy::concatenate_to_batch(emb_M);
-
         /* get adjacency matrix */
         auto G = tree->make_adj(emb_v, sent);
         auto Gt = dy::transpose(G);
 
+        auto M = dy::concatenate_to_batch(emb_M);
         auto status = dy::concatenate_cols(emb_v);
 
         for (size_t it = 0; it < iter; ++it) {
             auto input = status * Gt;
 
-            /* batch matvec */
+            // match matvec
             input = dy::reshape(input, dy::Dim({ embed_dim }, sz));
             auto out = dy::reshape(dy::tanh(M * input), status.dim());
-
-            // status = 0.5 * status + 0.5 * out;
 
             // compute a gate
             auto gate = dy::logistic(
@@ -114,7 +111,6 @@ struct ListOps : public BaseModel
 
             status = dy::cmult(gate, status) + dy::cmult(1 - gate,  out);
         }
-
         auto root = dy::pick(status, /* first elem */ 0u, /* along cols */ 1u);
 
         return dy::affine_transform({ e_out_b, e_out_W, root });

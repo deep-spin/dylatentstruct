@@ -58,7 +58,8 @@ struct MSTAdjacency : TreeAdjacency
 {
     dy::ComputationGraph* cg_;
     dynet::SparseMAPOpts opts;
-    MLPScoreBuilder scorer;
+    //MLPScoreBuilder scorer;
+    BilinearScoreBuilder scorer;
 
     explicit MSTAdjacency(dy::ParameterCollection& params,
                           const dy::SparseMAPOpts& opts,
