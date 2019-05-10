@@ -40,10 +40,17 @@ struct ListOps : public BaseModel
     {
         if (tree_type == ListOpOpts::Tree::GOLD)
             tree = std::make_unique<CustomAdjacency>();
+        if (tree_type == ListOpOpts::Tree::LTR)
+            tree = std::make_unique<LtrAdjacency>();
+        if (tree_type == ListOpOpts::Tree::FLAT)
+            tree = std::make_unique<FlatAdjacency>();
         else if (tree_type == ListOpOpts::Tree::MST)
             tree = std::make_unique<MSTAdjacency>(p, smap_opts, embed_dim);
         else if (tree_type == ListOpOpts::Tree::MST_LSTM)
             tree = std::make_unique<MSTLSTMAdjacency>(p, smap_opts, embed_dim);
+        else if (tree_type == ListOpOpts::Tree::MST_CONSTR)
+            tree = std::make_unique<MSTLSTMConstrAdjacency>(
+              p, smap_opts, embed_dim, /*budget=*/5);
     }
 
     int n_correct(dy::ComputationGraph& cg, const SentBatch& batch)
@@ -109,7 +116,7 @@ struct ListOps : public BaseModel
             auto gate = dy::logistic(
               dy::affine_transform({ e_gb, e_gW, status, e_gV, out }));
 
-            status = dy::cmult(gate, status) + dy::cmult(1 - gate,  out);
+            status = dy::cmult(gate, status) + dy::cmult(1 - gate, out);
         }
         auto root = dy::pick(status, /* first elem */ 0u, /* along cols */ 1u);
 

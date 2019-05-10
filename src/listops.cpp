@@ -70,6 +70,7 @@ train(ListOps& clf,
                 auto loss_val = dy::as_scalar(cg.incremental_forward(loss));
                 total_loss += batch->size() * loss_val;
                 cg.backward(loss);
+                trainer.update();
                 //clf.save("test.dy");
                 //abort();
             }
@@ -142,7 +143,8 @@ int main(int argc, char** argv)
     smap_opts.parse(argc, argv);
 
     bool is_sparsemap = (list_opts.get_tree() == ListOpOpts::Tree::MST
-                         || list_opts.get_tree() == ListOpOpts::Tree::MST_LSTM);
+                         || list_opts.get_tree() == ListOpOpts::Tree::MST_LSTM
+                         || list_opts.get_tree() == ListOpOpts::Tree::MST_CONSTR);
 
     if (is_sparsemap)
         std::cout << smap_opts << std::endl;

@@ -5,7 +5,7 @@
 
 #include "args.h"
 #include "builders/adjmatrix.h"
-#include "builders/gcn.h"
+#include "builders/gatedgcn.h"
 #include "models/esim.h"
 
 #include <iostream>
@@ -27,10 +27,7 @@ struct SyntacticESIM : public ESIM
                            bool update_embed = true)
       : ESIM{ params,    vocab_size, embed_dim, hidden_dim, n_classes,
               attn_type, smap_opts,  dropout_p, stacks,     update_embed }
-      , gcn_settings{ hidden_dim, gcn_layers, /*dense=*/true }
-      , gcn{ p, gcn_settings, hidden_dim }
-      , p_Ws(p.add_parameters({ hidden_dim, (1 + gcn_layers) * hidden_dim }))
-      , p_bs(p.add_parameters({ hidden_dim }))
+      , gcn{ p, gcn_layers, hidden_dim }
       {
         if (tree_type == GCNOpts::Tree::LTR)
             tree = std::make_unique<LtrAdjacency>();
@@ -53,11 +50,8 @@ struct SyntacticESIM : public ESIM
     virtual void new_graph(dy::ComputationGraph& cg) override
     {
         ESIM::new_graph(cg);
-        gcn.new_graph(cg, training_, true);
+        gcn.new_graph(cg, training_);
         tree->new_graph(cg);
-
-        Ws = dy::parameter(cg, p_Ws);
-        bs = dy::parameter(cg, p_bs);
     }
 
     virtual Expr2 syntactic_encode(
@@ -85,19 +79,14 @@ struct SyntacticESIM : public ESIM
         auto P_enc = gcn.apply(P, Gp);
         auto H_enc = gcn.apply(H, Gh);
 
-        P_enc = dy::rectify(dy::affine_transform({bs, Ws, P_enc}));
-        H_enc = dy::rectify(dy::affine_transform({bs, Ws, H_enc}));
-
         //return std::forward_as_tuple(P_enc, H_enc);
 
         return std::tie(P_enc, H_enc);
     }
 
 
-    GCNSettings gcn_settings;
-    GCNBuilder gcn;
+    //GCNSettings gcn_settings;
+    GatedGCNBuilder gcn;
     std::unique_ptr<TreeAdjacency> tree;
-    dy::Parameter p_Ws, p_bs;
-    dy::Expression Ws, bs;
 };
 

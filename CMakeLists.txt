@@ -48,6 +48,7 @@ add_library(
     src/data.cpp
     src/builders/bilstm.cpp
     src/builders/gcn.cpp
+    src/builders/gatedgcn.cpp
     src/builders/biattn.cpp
     src/builders/biattn-sparsemap.cpp
     src/builders/adjmatrix.cpp

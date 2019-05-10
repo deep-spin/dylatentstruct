@@ -84,3 +84,18 @@ struct MSTLSTMAdjacency : MSTAdjacency
                                     const Sentence& sent) override;
     virtual void new_graph(dy::ComputationGraph& cg) override;
 };
+
+struct MSTLSTMConstrAdjacency : MSTLSTMAdjacency
+{
+
+    explicit MSTLSTMConstrAdjacency(dy::ParameterCollection& params,
+                                    const dy::SparseMAPOpts& opts,
+                                    unsigned hidden_dim,
+                                    int budget);
+
+    virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
+                                    const Sentence& sent) override;
+    void new_graph(dy::ComputationGraph& cg) override;
+
+    int budget;
+};

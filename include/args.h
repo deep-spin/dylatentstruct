@@ -262,7 +262,7 @@ struct ListOpOpts : public BaseOpts
             return Tree::MST;
         else if (tree_str == "mst-lstm")
             return Tree::MST_LSTM;
-        else if (tree_str == "mst_constr")
+        else if (tree_str == "mst-constr")
             return Tree::MST_CONSTR;
         else {
             std::cerr << "Invalid tree type." << std::endl;

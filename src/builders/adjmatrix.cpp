@@ -192,3 +192,76 @@ MSTLSTMAdjacency::make_adj(const std::vector<dy::Expression>& enc,
     return MSTAdjacency::make_adj(lstm_out, sentence);
 }
 
+
+MSTLSTMConstrAdjacency::MSTLSTMConstrAdjacency(dy::ParameterCollection& params,
+                                               const dy::SparseMAPOpts& opts,
+                                               unsigned hidden_dim,
+                                               int budget)
+  : MSTLSTMAdjacency{ params, opts, hidden_dim }
+  , budget(budget)
+{}
+
+void
+MSTLSTMConstrAdjacency::new_graph(dy::ComputationGraph& cg)
+{
+    MSTLSTMAdjacency::new_graph(cg);
+}
+
+
+dy::Expression
+MSTLSTMConstrAdjacency::make_adj(const std::vector<dy::Expression>& enc,
+                                 const Sentence&)
+{
+    lstm.start_new_sequence();
+    auto sz = enc.size();
+    std::vector<dy::Expression> lstm_out(sz);
+    for (auto i = 0u; i < sz; ++i)
+        lstm_out.at(i) = lstm.add_input(enc.at(i));
+
+    auto fg = std::make_unique<AD3::FactorGraph>();
+    std::vector<AD3::BinaryVariable*> vars;
+    std::vector<std::tuple<int, int>> arcs;
+
+    if (sz > 385) { // 99th percentile: use flat
+        std::vector<unsigned> nonneg_heads(sz - 1, 0);
+        return ::make_fixed_adj(*cg_, nonneg_heads);
+    }
+
+    unsigned k = 1;
+
+    std::vector<std::vector<AD3::BinaryVariable*>> kids(sz);
+
+    for (size_t m = 1; m < sz; ++m) {
+        for (size_t h = 0; h < sz; ++h) {
+            if (h != m) {
+                arcs.push_back(std::make_tuple(h, m));
+                auto var = fg->CreateBinaryVariable();
+                vars.push_back(var);
+                kids.at(h).push_back(var);
+                ++k;
+            }
+        }
+    }
+
+    // ugly transfer of ownership, as in AD3. How to be safer?
+    AD3::Factor* tree_factor = new AD3::FactorTree;
+    fg->DeclareFactor(tree_factor, vars, /*pass_ownership=*/true);
+    static_cast<AD3::FactorTree*>(tree_factor)->Initialize(sz, arcs);
+
+    for (size_t h = 0; h < sz; ++h)
+        fg->CreateFactorBUDGET(kids.at(h), budget, /*own=*/true);
+
+    auto scores = scorer.make_potentials(enc);
+    const auto device_name = scores.get_device_name();
+    auto* device = dy::get_device_manager()->get_global_device(device_name);
+    auto* cpu = dy::get_device_manager()->get_global_device("CPU");
+    auto scores_cpu_matrix = dy::to_device(scores, cpu);
+    auto scores_cpu = dy::adj_to_arcs(scores_cpu_matrix);
+
+    //fg->SetVerbosity(10);
+    auto u_cpu = dy::sparsemap(scores_cpu, std::move(fg), opts);
+    u_cpu = dy::arcs_to_adj(u_cpu, sz);
+
+    auto u = dy::to_device(u_cpu, device);
+    return u;
+}
