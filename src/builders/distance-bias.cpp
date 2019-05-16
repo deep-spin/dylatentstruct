@@ -50,8 +50,6 @@ DistanceBiasBuilder::compute(dy::Expression& input)
     dy::Expression bias;
     if (active) {
         auto v = bias_indices(size, bucket, dir_sensitive);
-
-        std::cout << std::endl;
         bias = dy::lookup(*input.pg, lp_distance, v);
         bias = dy::reshape(bias, { size, size });
     }
