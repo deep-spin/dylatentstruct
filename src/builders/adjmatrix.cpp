@@ -83,9 +83,11 @@ CustomAdjacency::make_adj(const std::vector<dy::Expression>&,
 
 MSTAdjacency::MSTAdjacency(dy::ParameterCollection& params,
                            const dy::SparseMAPOpts& opts,
-                           unsigned hidden_dim)
+                           unsigned hidden_dim,
+                           bool use_distance)
   : opts{ opts }
   , scorer{ params, hidden_dim, hidden_dim }
+  , distance_bias{ params, use_distance }
 {}
 
 void
@@ -132,6 +134,8 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     static_cast<AD3::FactorTree*>(tree_factor)->Initialize(sz, arcs);
 
     auto scores = scorer.make_potentials(enc);
+    scores = distance_bias.compute(scores);
+
     const auto device_name = scores.get_device_name();
     auto* device = dy::get_device_manager()->get_global_device(device_name);
     auto* cpu = dy::get_device_manager()->get_global_device("CPU");

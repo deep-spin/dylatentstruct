@@ -33,7 +33,7 @@ struct ESIM : public BaseNLI
 
     BiLSTMBuilder bilstm_inf;
 
-    ESIMArgs::Attn attn_type;
+    AttnOpts::Attn attn_type;
     std::unique_ptr<BiAttentionBuilder> attn;
 
     explicit ESIM(ParameterCollection& params,
@@ -41,7 +41,7 @@ struct ESIM : public BaseNLI
                   unsigned embed_dim,
                   unsigned hidden_dim,
                   unsigned n_classes,
-                  ESIMArgs::Attn attn_type,
+                  AttnOpts::Attn attn_type,
                   const dy::SparseMAPOpts& smap_opts,
                   float dropout_p = .5,
                   unsigned stacks = 1,
@@ -64,18 +64,18 @@ struct ESIM : public BaseNLI
       , attn_type(attn_type)
     {
 
-        if (attn_type == ESIMArgs::Attn::SOFTMAX)
+        if (attn_type == AttnOpts::Attn::SOFTMAX)
             attn = std::make_unique<BiSoftmaxBuilder>();
-        else if (attn_type == ESIMArgs::Attn::SPARSEMAX)
+        else if (attn_type == AttnOpts::Attn::SPARSEMAX)
             attn = std::make_unique<BiSparsemaxBuilder>();
-        else if (attn_type == ESIMArgs::Attn::HEAD)
+        else if (attn_type == AttnOpts::Attn::HEAD)
             attn = std::make_unique<HeadPreservingBuilder>(p, smap_opts);
-        else if (attn_type == ESIMArgs::Attn::HEADMATCH)
+        else if (attn_type == AttnOpts::Attn::HEADMATCH)
             attn =
               std::make_unique<HeadPreservingMatchingBuilder>(p, smap_opts);
-        else if (attn_type == ESIMArgs::Attn::HEADHO)
+        else if (attn_type == AttnOpts::Attn::HEADHO)
             attn = std::make_unique<HeadHOBuilder>(p, smap_opts);
-        else if (attn_type == ESIMArgs::Attn::HEADMATCHHO)
+        else if (attn_type == AttnOpts::Attn::HEADMATCHHO)
             attn = std::make_unique<HeadHOMatchingBuilder>(p, smap_opts);
         else {
             std::cerr << "Unimplemented attention mechanism." << std::endl;

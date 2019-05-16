@@ -126,6 +126,9 @@ struct TrainOpts : BaseOpts
 struct GCNOpts : BaseOpts
 {
     unsigned layers = 0;
+    unsigned iter = 1;
+    unsigned use_distance = false;
+
     float dropout = .1f;
     std::string tree_str = "gold";
 
@@ -135,6 +138,7 @@ struct GCNOpts : BaseOpts
         LTR,
         GOLD,
         MST,
+        MST_CONSTR
     };
 
     Tree get_tree() const
@@ -147,10 +151,19 @@ struct GCNOpts : BaseOpts
             return Tree::GOLD;
         else if (tree_str == "mst")
             return Tree::MST;
+        else if (tree_str == "mst-constr")
+            return Tree::MST_CONSTR;
         else {
             std::cerr << "Invalid tree type." << std::endl;
             std::exit(EXIT_FAILURE);
         }
+    }
+
+    bool is_sparsemap()
+    {
+        auto tree = get_tree();
+        return (tree == Tree::MST ||
+                tree == Tree::MST_CONSTR);
     }
 
     virtual void parse(int argc, char** argv)
@@ -164,6 +177,12 @@ struct GCNOpts : BaseOpts
                 std::istringstream vals(val);
                 vals >> layers;
                 i += 2;
+            } else if (arg == "--gcn-iter") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> iter;
+                i += 2;
             } else if (arg == "--gcn-drop") {
                 assert(i + 1 < argc);
                 std::string val = argv[i + 1];
@@ -174,6 +193,9 @@ struct GCNOpts : BaseOpts
                 assert(i + 1 < argc);
                 tree_str = argv[i + 1];
                 i += 2;
+            } else if (arg == "--use-distance") {
+                use_distance = true;
+                i += 1;
             } else {
                 i += 1;
             }
@@ -184,17 +206,22 @@ struct GCNOpts : BaseOpts
     {
         o << "GCN settins\n";
         o << "  GCN layers: " << layers << '\n';
+        o << "    GCN iter: " << iter << '\n';
         o << " GCN dropout: " << dropout << '\n';
         o << "        tree: " << tree_str << '\n';
+        o << "    use dist: " << use_distance << '\n';
         return o;
     }
 
     virtual std::string get_filename() const
     {
         std::ostringstream fn;
-        fn << "_gcn_" << layers
-           << "_gcndrop_" << dropout
-           << "_strat_" << tree_str;
+        if (layers > 0)
+            fn << "_gcn_" << layers
+               << "_iter_" << iter
+               << "_gcndrop_" << dropout
+               << "_strat_" << tree_str
+               << "_usedist_" << use_distance;
         return fn.str();
     }
 };
@@ -325,7 +352,8 @@ struct ListOpOpts : public BaseOpts
     }
 };
 
-struct ESIMArgs : public BaseOpts
+
+struct AttnOpts : public BaseOpts
 {
     enum class Attn
     {
@@ -336,12 +364,6 @@ struct ESIMArgs : public BaseOpts
         HEADHO,
         HEADMATCHHO
     };
-
-    std::string dataset;
-    std::string attn_str = "softmax";
-    float dropout = 0.5;
-    int max_decode_iter;
-    int lstm_layers;
 
     bool is_sparsemap()
     {
@@ -357,25 +379,9 @@ struct ESIMArgs : public BaseOpts
         int i = 1;
         while (i < argc) {
             std::string arg = argv[i];
-            if (arg == "--dataset") {
-                assert(i + 1 < argc);
-                dataset = argv[i + 1];
-                i += 2;
-            } else if (arg == "--attn") {
+            if (arg == "--attn") {
                 assert(i + 1 < argc);
                 attn_str = argv[i + 1];
-                i += 2;
-            } else if (arg == "--drop") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> dropout;
-                i += 2;
-            } else if (arg == "--lstm-layers") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> lstm_layers;
                 i += 2;
             } else {
                 i += 1;
@@ -406,7 +412,124 @@ struct ESIMArgs : public BaseOpts
     virtual std::string get_filename() const override
     {
         std::ostringstream fn;
-        fn << "_ESIM_" << dataset << "_attn_" << attn_str << "_drop_"
+        fn << "_attn_" << attn_str;
+        return fn.str();
+    }
+
+    virtual std::ostream& print(std::ostream& o) const override
+    {
+        o << " Attention settings\n"
+          << "     Attn type: " << attn_str << '\n';
+        return o;
+    }
+
+    std::string attn_str = "softmax";
+};
+
+
+struct DecompOpts : public BaseOpts
+{
+
+    std::string dataset;
+    int lstm_layers = 0;
+    bool update_embed = false;
+    bool normalize_embed = false;
+    float dropout = .0f;
+
+    virtual void parse(int argc, char** argv)
+    {
+        int i = 1;
+        while (i < argc) {
+            std::string arg = argv[i];
+            if (arg == "--dataset") {
+                assert(i + 1 < argc);
+                dataset = argv[i + 1];
+                i += 2;
+            } else if (arg == "--drop") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dropout;
+                i += 2;
+            } else if (arg == "--update-embed") {
+                update_embed = true;
+                i += 1;
+            } else if (arg == "--normalize-embed") {
+                normalize_embed = true;
+                i += 1;
+            } else if (arg == "--lstm-layers") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> lstm_layers;
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    virtual std::string get_filename() const override
+    {
+        std::ostringstream fn;
+        fn << "_Decomp_" << dataset
+           << "_drop_" << dropout
+           << "_lstm_" << lstm_layers
+           << "_update_" << update_embed
+           << "_nrm_" << normalize_embed;
+        return fn.str();
+    }
+
+    virtual std::ostream& print(std::ostream& o) const override
+    {
+        o << " Decomp settings\n"
+          << "     Dataset: " << dataset << '\n'
+          << "     Dropout: " << dropout << '\n'
+          << "     LSTM layers: " << lstm_layers << '\n'
+          << "     Update emb: " << update_embed << '\n'
+          << "     Normlz emb: " << normalize_embed << '\n';
+        return o;
+    }
+};
+
+struct ESIMOpts : public BaseOpts
+{
+
+    std::string dataset;
+    float dropout = 0.5;
+    int lstm_layers;
+
+    virtual void parse(int argc, char** argv)
+    {
+        int i = 1;
+        while (i < argc) {
+            std::string arg = argv[i];
+            if (arg == "--dataset") {
+                assert(i + 1 < argc);
+                dataset = argv[i + 1];
+                i += 2;
+            } else if (arg == "--drop") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dropout;
+                i += 2;
+            } else if (arg == "--lstm-layers") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> lstm_layers;
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    virtual std::string get_filename() const override
+    {
+        std::ostringstream fn;
+        fn << "_ESIM_" << dataset << "_drop_"
            << dropout;
         return fn.str();
     }
@@ -416,8 +539,7 @@ struct ESIMArgs : public BaseOpts
         o << " ESIM settings\n"
           << " LSTM layers: " << lstm_layers << '\n'
           << "     Dataset: " << dataset << '\n'
-          << "     Dropout: " << dropout << '\n'
-          << "   Attention: " << attn_str << '\n';
+          << "     Dropout: " << dropout << '\n';
         return o;
     }
 };

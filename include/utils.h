@@ -2,22 +2,12 @@
 
 // #include <Eigen/Eigen>
 #include <fstream>
+#include <vector>
 #include <cassert>
 
 /*
  * Generic utils
  */
 
-
-unsigned line_count(const std::string filename)
-{
-    std::ifstream in(filename);
-    assert(in);
-    std::string line;
-
-    unsigned lines = 0;
-    while (getline(in, line))
-        ++lines;
-
-    return lines;
-}
+void normalize_vector(std::vector<float> & v);
+unsigned line_count(const std::string filename);

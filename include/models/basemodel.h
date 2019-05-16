@@ -9,6 +9,7 @@
 #include <fstream>
 
 #include "data.h"
+#include "utils.h"
 #include "builders/bilstm.h"
 
 namespace dy = dynet;
@@ -93,7 +94,8 @@ struct BaseEmbedBiLSTMModel : BaseModel
 
     void
     load_embeddings(
-        const std::string filename)
+        const std::string filename,
+        bool normalize=false)
     {
         std::cerr << "~ ~ loading embeddings... ~ ~ ";
         std::ifstream in(filename);
@@ -108,6 +110,9 @@ struct BaseEmbedBiLSTMModel : BaseModel
 
             for (unsigned i = 0; i < embed_dim_; ++i)
                 lin >> embed[i];
+
+            if (normalize)
+                normalize_vector(embed);
 
             p_emb.initialize(ix, embed);
             ix += 1;

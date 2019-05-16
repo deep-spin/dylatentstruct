@@ -11,6 +11,7 @@
 #include "data.h"
 
 #include "builders/arcscorers.h"
+#include "builders/distance-bias.h"
 #include "sparsemap.h"
 
 namespace dy = dynet;
@@ -57,13 +58,15 @@ struct CustomAdjacency : FixedAdjacency
 struct MSTAdjacency : TreeAdjacency
 {
     dy::ComputationGraph* cg_;
-    dynet::SparseMAPOpts opts;
+    dy::SparseMAPOpts opts;
     //MLPScoreBuilder scorer;
     BilinearScoreBuilder scorer;
+    DistanceBiasBuilder distance_bias;
 
     explicit MSTAdjacency(dy::ParameterCollection& params,
                           const dy::SparseMAPOpts& opts,
-                          unsigned hidden_dim);
+                          unsigned hidden_dim,
+                          bool use_distance=true);
 
     virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
                                     const Sentence& sent) override;

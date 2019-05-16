@@ -19,7 +19,7 @@ struct SyntacticESIM : public ESIM
                            unsigned n_classes,
                            unsigned gcn_layers,
                            GCNOpts::Tree tree_type,
-                           ESIMArgs::Attn attn_type,
+                           AttnOpts::Attn attn_type,
                            const dy::SparseMAPOpts& smap_opts,
                            float dropout_p = .5,
                            float gcn_dropout_p = .1,
@@ -27,7 +27,7 @@ struct SyntacticESIM : public ESIM
                            bool update_embed = true)
       : ESIM{ params,    vocab_size, embed_dim, hidden_dim, n_classes,
               attn_type, smap_opts,  dropout_p, stacks,     update_embed }
-      , gcn{ p, gcn_layers, hidden_dim }
+      , gcn{ p, 1, gcn_layers, hidden_dim }
       {
         if (tree_type == GCNOpts::Tree::LTR)
             tree = std::make_unique<LtrAdjacency>();
@@ -41,8 +41,6 @@ struct SyntacticESIM : public ESIM
             std::cerr << "Not implemented";
             std::abort();
         }
-
-        std::cout << gcn_dropout_p << dropout_p << std::endl;
 
         gcn.set_dropout(gcn_dropout_p);
     }

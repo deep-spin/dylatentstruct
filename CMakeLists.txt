@@ -46,12 +46,14 @@ add_library(
     dylatentstruct
 
     src/data.cpp
+    src/utils.cpp
     src/builders/bilstm.cpp
     src/builders/gcn.cpp
     src/builders/gatedgcn.cpp
     src/builders/biattn.cpp
     src/builders/biattn-sparsemap.cpp
     src/builders/adjmatrix.cpp
+    src/builders/distance-bias.cpp
     src/factors/FactorTree.cpp
     src/layers/arcs-to-adj.cpp
 )
@@ -90,6 +92,7 @@ target_compile_options(dylatentstruct PUBLIC
 
 # add_executable(sentclf src/sentclf.cpp)
 add_executable(esim src/esim.cpp)
+add_executable(decomp src/decomp.cpp)
 add_executable(listops src/listops.cpp)
 add_executable(check src/check.cpp)
 add_executable(test-arcs-to-adj src/test-arcs-to-adj.cpp)
@@ -97,6 +100,7 @@ add_executable(test-arcs-to-adj src/test-arcs-to-adj.cpp)
 
 #target_link_libraries(sentclf PUBLIC dylatentstruct)
 target_link_libraries(esim PUBLIC dylatentstruct)
+target_link_libraries(decomp PUBLIC dylatentstruct)
 target_link_libraries(listops PUBLIC dylatentstruct)
 #target_link_libraries(mlflowtest PUBLIC dylatentstruct)
 target_link_libraries(test-arcs-to-adj PUBLIC dylatentstruct)

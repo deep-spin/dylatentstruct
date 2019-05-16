@@ -7,32 +7,39 @@
 
 namespace dy = dynet;
 
+struct GatedGCNParams {
+
+    GatedGCNParams(dy::ParameterCollection& pc, unsigned dim);
+
+    dy::Parameter W_parent;
+    dy::Parameter b_parent;
+    dy::Parameter W_children;
+    dy::Parameter b_children;
+    dy::Parameter W_gate_old;
+    dy::Parameter W_gate_new;
+    dy::Parameter b_gate;
+};
+
+struct GatedGCNExprs {
+
+    GatedGCNExprs() = default;
+    GatedGCNExprs(dy::ComputationGraph& cg, GatedGCNParams params);
+
+    dy::Expression W_parent;
+    dy::Expression b_parent;
+    dy::Expression W_children;
+    dy::Expression b_children;
+    dy::Expression W_gate_old;
+    dy::Expression W_gate_new;
+    dy::Expression b_gate;
+};
+
 struct GatedGCNBuilder
 {
     dy::ParameterCollection local_pc;
 
-    dy::Parameter p_W_parent;
-    dy::Parameter p_b_parent;
-    dy::Parameter p_W_children;
-    dy::Parameter p_b_children;
-    dy::Parameter p_W_gate_old;
-    dy::Parameter p_W_gate_new;
-    dy::Parameter p_b_gate;
-
-    dy::Expression e_W_parent;
-    dy::Expression e_b_parent;
-    dy::Expression e_W_children;
-    dy::Expression e_b_children;
-    dy::Expression e_W_gate_old;
-    dy::Expression e_W_gate_new;
-    dy::Expression e_b_gate;
-
-    unsigned n_iter;
-
-    bool _training = true;
-    float dropout_rate = 0.f;
-
     GatedGCNBuilder(dy::ParameterCollection& pc,
+                    unsigned n_layers,
                     unsigned n_iter,
                     unsigned dim);
 
@@ -41,4 +48,12 @@ struct GatedGCNBuilder
                          const dy::Expression& graph);
 
     void set_dropout(float value);
+
+    unsigned n_iter;
+    unsigned n_layers;
+    std::vector<GatedGCNParams> params;
+    std::vector<GatedGCNExprs> exprs;
+
+    bool _training = true;
+    float dropout_rate = 0.f;
 };
