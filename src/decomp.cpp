@@ -86,6 +86,7 @@ main(int argc, char** argv)
                                attn_opts.get_attn(),
                                smap_opts.sm_opts,
                                decomp_opts.dropout,
+                               gcn_opts.budget,
                                decomp_opts.lstm_layers,
                                decomp_opts.update_embed);
 
@@ -112,6 +113,7 @@ main(int argc, char** argv)
         mlflow.log_parameter("GCN_layers", std::to_string(gcn_opts.layers));
         mlflow.log_parameter("GCN_iter", std::to_string(gcn_opts.iter));
         mlflow.log_parameter("GCN_tree_type", gcn_opts.tree_str);
+        mlflow.log_parameter("GCN_BUDGET", std::to_string(gcn_opts.budget));
         mlflow.log_parameter("GCN_dropout", std::to_string(gcn_opts.dropout));
         mlflow.log_parameter("GCN_use_distance", gcn_opts.use_distance ? "true" : "false");
     }

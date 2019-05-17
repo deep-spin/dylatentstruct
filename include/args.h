@@ -128,6 +128,7 @@ struct GCNOpts : BaseOpts
     unsigned layers = 0;
     unsigned iter = 1;
     unsigned use_distance = false;
+    int budget = 0;
 
     float dropout = .1f;
     std::string tree_str = "gold";
@@ -151,8 +152,6 @@ struct GCNOpts : BaseOpts
             return Tree::GOLD;
         else if (tree_str == "mst")
             return Tree::MST;
-        else if (tree_str == "mst-constr")
-            return Tree::MST_CONSTR;
         else {
             std::cerr << "Invalid tree type." << std::endl;
             std::exit(EXIT_FAILURE);
@@ -189,6 +188,12 @@ struct GCNOpts : BaseOpts
                 std::istringstream vals(val);
                 vals >> dropout;
                 i += 2;
+            } else if (arg == "--budget") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> budget;
+                i += 2;
             } else if (arg == "--tree") {
                 assert(i + 1 < argc);
                 tree_str = argv[i + 1];
@@ -209,6 +214,7 @@ struct GCNOpts : BaseOpts
         o << "    GCN iter: " << iter << '\n';
         o << " GCN dropout: " << dropout << '\n';
         o << "        tree: " << tree_str << '\n';
+        o << "      budget: " << budget << '\n';
         o << "    use dist: " << use_distance << '\n';
         return o;
     }
@@ -221,7 +227,8 @@ struct GCNOpts : BaseOpts
                << "_iter_" << iter
                << "_gcndrop_" << dropout
                << "_strat_" << tree_str
-               << "_usedist_" << use_distance;
+               << "_usedist_" << use_distance
+               << "_budget_" << budget;
         return fn.str();
     }
 };

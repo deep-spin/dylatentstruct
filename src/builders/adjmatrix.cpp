@@ -84,10 +84,12 @@ CustomAdjacency::make_adj(const std::vector<dy::Expression>&,
 MSTAdjacency::MSTAdjacency(dy::ParameterCollection& params,
                            const dy::SparseMAPOpts& opts,
                            unsigned hidden_dim,
-                           bool use_distance)
+                           bool use_distance,
+                           int budget)
   : opts{ opts }
   , scorer{ params, hidden_dim, hidden_dim }
   , distance_bias{ params, use_distance }
+  , budget{ budget }
 {}
 
 void
@@ -113,17 +115,16 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
 
     unsigned k = 1;
 
-    std::vector<unsigned> reverse_ixs(sz); // start with a column of zeros
+    std::vector<std::vector<AD3::BinaryVariable*>> kids(sz);
 
     for (size_t m = 1; m < sz; ++m) {
         for (size_t h = 0; h < sz; ++h) {
             if (h != m) {
                 arcs.push_back(std::make_tuple(h, m));
-                vars.push_back(fg->CreateBinaryVariable());
-                reverse_ixs.push_back(k);
+                auto var = fg->CreateBinaryVariable();
+                vars.push_back(var);
+                kids.at(h).push_back(var);
                 ++k;
-            } else {
-                reverse_ixs.push_back(0);
             }
         }
     }
@@ -132,6 +133,10 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     AD3::Factor* tree_factor = new AD3::FactorTree;
     fg->DeclareFactor(tree_factor, vars, /*pass_ownership=*/true);
     static_cast<AD3::FactorTree*>(tree_factor)->Initialize(sz, arcs);
+
+    if (budget > 0)
+        for (size_t h = 0; h < sz; ++h)
+            fg->CreateFactorBUDGET(kids.at(h), budget, /*own=*/true);
 
     auto scores = scorer.make_potentials(enc);
     scores = distance_bias.compute(scores);
@@ -269,3 +274,4 @@ MSTLSTMConstrAdjacency::make_adj(const std::vector<dy::Expression>& enc,
     auto u = dy::to_device(u_cpu, device);
     return u;
 }
+

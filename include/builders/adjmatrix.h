@@ -62,15 +62,18 @@ struct MSTAdjacency : TreeAdjacency
     //MLPScoreBuilder scorer;
     BilinearScoreBuilder scorer;
     DistanceBiasBuilder distance_bias;
+    int budget;
 
     explicit MSTAdjacency(dy::ParameterCollection& params,
                           const dy::SparseMAPOpts& opts,
                           unsigned hidden_dim,
-                          bool use_distance=true);
+                          bool use_distance=true,
+                          int budget=0);
 
     virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
                                     const Sentence& sent) override;
     virtual void new_graph(dy::ComputationGraph& cg) override;
+
 };
 
 

@@ -29,6 +29,7 @@ struct Decomp : public BaseNLI
                     AttnOpts::Attn attn_type,
                     const dy::SparseMAPOpts& smap_opts,
                     float dropout_p,
+                    int budget=0,
                     unsigned stacks = 0,
                     bool update_embed = false)
       : BaseNLI(params,
@@ -64,7 +65,7 @@ struct Decomp : public BaseNLI
             tree = std::make_unique<CustomAdjacency>();
         else if (tree_type == GCNOpts::Tree::MST)
             tree = std::make_unique<MSTAdjacency>(
-              p, smap_opts, hidden_dim, use_distance);
+              p, smap_opts, hidden_dim, use_distance, budget);
         else {
             std::cerr << "Not implemented";
             std::abort();
@@ -201,7 +202,7 @@ struct Decomp : public BaseNLI
       const NLIBatch& batch) override
     {
         new_graph(cg);
-        // cg.set_immediate_compute(true);
+         cg.set_immediate_compute(true);
 
         vector<Expression> out;
 
