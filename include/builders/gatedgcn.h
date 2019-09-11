@@ -36,8 +36,6 @@ struct GatedGCNExprs {
 
 struct GatedGCNBuilder
 {
-    dy::ParameterCollection local_pc;
-
     GatedGCNBuilder(dy::ParameterCollection& pc,
                     unsigned n_layers,
                     unsigned n_iter,
@@ -48,6 +46,8 @@ struct GatedGCNBuilder
                          const dy::Expression& graph);
 
     void set_dropout(float value);
+
+    dy::ParameterCollection local_pc;
 
     unsigned n_iter;
     unsigned n_layers;

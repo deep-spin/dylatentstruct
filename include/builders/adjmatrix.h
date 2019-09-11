@@ -6,11 +6,11 @@
 
 #include <dynet/expr.h>
 #include <dynet/model.h>
-#include <dynet/lstm.h>
 
 #include "data.h"
 
 #include "builders/arcscorers.h"
+#include "builders/bilstm.h"
 #include "builders/distance-bias.h"
 #include "sparsemap.h"
 
@@ -18,7 +18,7 @@ namespace dy = dynet;
 
 struct TreeAdjacency
 {
-    virtual void new_graph(dy::ComputationGraph& cg) = 0;
+    virtual void new_graph(dy::ComputationGraph& cg, bool training) = 0;
     virtual dy::Expression make_adj(const std::vector<dy::Expression>& input,
                                     const Sentence& sent) = 0;
 
@@ -28,12 +28,15 @@ struct TreeAdjacency
       const std::vector<dy::Expression>& enc_hypo,
       const Sentence& prem,
       const Sentence& hypo);
+
+    virtual void set_print(const std::string&) {};
+    virtual void clear_print() {};
 };
 
 struct FixedAdjacency : TreeAdjacency
 {
     dy::ComputationGraph* cg_;
-    virtual void new_graph(dy::ComputationGraph& cg) override;
+    virtual void new_graph(dy::ComputationGraph& cg, bool training) override;
     virtual dy::Expression make_fixed_adj(const std::vector<unsigned>& heads);
 };
 
@@ -57,13 +60,6 @@ struct CustomAdjacency : FixedAdjacency
 
 struct MSTAdjacency : TreeAdjacency
 {
-    dy::ComputationGraph* cg_;
-    dy::SparseMAPOpts opts;
-    //MLPScoreBuilder scorer;
-    BilinearScoreBuilder scorer;
-    DistanceBiasBuilder distance_bias;
-    int budget;
-
     explicit MSTAdjacency(dy::ParameterCollection& params,
                           const dy::SparseMAPOpts& opts,
                           unsigned hidden_dim,
@@ -72,36 +68,39 @@ struct MSTAdjacency : TreeAdjacency
 
     virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
                                     const Sentence& sent) override;
-    virtual void new_graph(dy::ComputationGraph& cg) override;
+    virtual void new_graph(dy::ComputationGraph& cg, bool training) override;
 
+    virtual void set_print(const std::string& fn) override {
+        opts.log_stream = std::make_shared<std::ofstream>(fn);
+    }
+
+    virtual void clear_print() override {
+        opts.log_stream.reset();
+    }
+
+    dy::ComputationGraph* cg_;
+    dy::SparseMAPOpts opts;
+    BilinearScoreBuilder scorer;
+    DistanceBiasBuilder distance_bias;
+    int budget;
 };
 
 
 struct MSTLSTMAdjacency : MSTAdjacency
 {
 
-    dy::VanillaLSTMBuilder lstm;
-
     explicit MSTLSTMAdjacency(dy::ParameterCollection& params,
                               const dy::SparseMAPOpts& opts,
-                              unsigned hidden_dim);
+                              unsigned hidden_dim,
+                              float dropout_p=.0f,
+                              int budget=0);
 
     virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
                                     const Sentence& sent) override;
-    virtual void new_graph(dy::ComputationGraph& cg) override;
+    virtual void new_graph(dy::ComputationGraph& cg, bool training) override;
+
+    BiLSTMSettings bilstm_settings;
+    BiLSTMBuilder bilstm;
+    float dropout_p;
 };
 
-struct MSTLSTMConstrAdjacency : MSTLSTMAdjacency
-{
-
-    explicit MSTLSTMConstrAdjacency(dy::ParameterCollection& params,
-                                    const dy::SparseMAPOpts& opts,
-                                    unsigned hidden_dim,
-                                    int budget);
-
-    virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
-                                    const Sentence& sent) override;
-    void new_graph(dy::ComputationGraph& cg) override;
-
-    int budget;
-};

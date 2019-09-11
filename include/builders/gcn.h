@@ -19,24 +19,50 @@ struct GCNSettings
     bool dense;
 };
 
+struct GCNParams {
+
+    GCNParams(dy::ParameterCollection& pc, unsigned dim_in, unsigned dim_out);
+
+    dy::Parameter W_parents;
+    dy::Parameter b_parents;
+    dy::Parameter W_children;
+    dy::Parameter b_children;
+    dy::Parameter W_self;
+    dy::Parameter b_self;
+};
+
+struct GCNExprs {
+
+    GCNExprs() = default;
+    GCNExprs(dy::ComputationGraph& cg, GCNParams params);
+
+    dy::Expression W_parents;
+    dy::Expression b_parents;
+    dy::Expression W_children;
+    dy::Expression b_children;
+    dy::Expression W_self;
+    dy::Expression b_self;
+};
+
 
 struct GCNBuilder
 {
-    const GCNSettings settings;
-    dy::ParameterCollection local_pc;
+    GCNBuilder(dy::ParameterCollection& pc,
+               unsigned n_layers,
+               unsigned dim_in,
+               unsigned dim_out,
+               bool dense);
 
-    std::vector<dy::Parameter> p_W_parents, p_b_parents, p_W_children, p_b_children, p_W_self, p_b_self;
-    std::vector<dy::Expression> e_W_parents, e_b_parents, e_W_children, e_b_children, e_W_self, e_b_self;
-
-    unsigned _output_rows;
-    bool _training = true;
-    float dropout_rate = 0.f;
-
-    GCNBuilder(dy::ParameterCollection& pc, const GCNSettings& settings, unsigned dim_input);
-
-    void new_graph(dy::ComputationGraph& cg, bool training, bool update);
+    void new_graph(dy::ComputationGraph& cg, bool training);
     dy::Expression apply(const dy::Expression &input, const dy::Expression& graph);
 
     void set_dropout(float value);
-    unsigned output_rows() const;
+
+    dy::ParameterCollection local_pc;
+    std::vector<GCNParams> params;
+    std::vector<GCNExprs> exprs;
+    unsigned n_layers;
+    bool dense;
+    bool _training = true;
+    float dropout_rate = 0.f;
 };

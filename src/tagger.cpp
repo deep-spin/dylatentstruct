@@ -16,7 +16,7 @@
 #include "mlflow.h"
 #include "crayon.h"
 
-#include "models/sentclf_model.h"
+#include "models/tagger.h"
 
 namespace dy = dynet;
 
@@ -27,8 +27,8 @@ using std::endl;
 
 float
 validate(
-    std::unique_ptr<GCNSentClf>& clf,
-    const vector<SentBatch>& data)
+    std::unique_ptr<GCNTagger>& clf,
+    const vector<TaggedBatch>& data)
 {
     int n_correct = 0;
     int n_total = 0;
@@ -36,7 +36,8 @@ validate(
     {
         dy::ComputationGraph cg;
         n_correct += clf->n_correct(cg, valid_batch);
-        n_total += valid_batch.size();
+        for (auto&& sent : valid_batch)
+            n_total += sent.size();
     }
 
     return float(n_correct) / n_total;
@@ -45,38 +46,47 @@ validate(
 
 void
 test(
-    std::unique_ptr<GCNSentClf>& clf,
+    std::unique_ptr<GCNTagger>& clf,
     const TrainOpts& opts,
+    const std::string& valid_fn,
     const std::string& test_fn)
 {
     clf->load(opts.saved_model);
-    auto test_data = read_batches<LabeledSentence>(test_fn, opts.batch_size);
-    float acc = validate(clf, test_data);
-    cout << "Test accuracy: " << acc << endl;
+
+    clf->tree->set_print(opts.saved_model + "valid-trees.txt");
+    auto valid_data = read_batches<TaggedSentence>(valid_fn, opts.batch_size);
+    float valid_acc = validate(clf, valid_data);
+    cout << "Valid accuracy: " << valid_acc << endl;
+
+    clf->tree->set_print(opts.saved_model + "test-trees.txt");
+    auto test_data = read_batches<TaggedSentence>(test_fn, opts.batch_size);
+    float test_acc = validate(clf, test_data);
+    cout << "Test accuracy: " << test_acc << endl;
 }
 
 
 void
 train(
-    std::unique_ptr<GCNSentClf>& clf,
+    std::unique_ptr<GCNTagger>& clf,
     const TrainOpts& opts,
     const std::string& out_fn,
     const std::string& train_fn,
     const std::string& valid_fn,
     MLFlowRun& mlflow)
 {
-    auto train_data = read_batches<LabeledSentence>(train_fn, opts.batch_size);
-    auto valid_data = read_batches<LabeledSentence>(valid_fn, opts.batch_size);
+    auto train_data = read_batches<TaggedSentence>(train_fn, opts.batch_size);
+    auto valid_data = read_batches<TaggedSentence>(valid_fn, opts.batch_size);
     auto n_batches = train_data.size();
 
-    unsigned n_train_sents = 0;
+    unsigned n_train_toks = 0;
     for (auto&& batch : train_data)
-        n_train_sents += batch.size();
+        for (auto&& sent : batch)
+            n_train_toks += sent.size();
 
-    std::cout << "Training on " << n_train_sents << " sentences." << std::endl;
+    std::cout << "Training on " << n_train_toks << " tokens." << std::endl;
 
     // make an identity permutation vector of pointers into the batches
-    vector<vector<SentBatch>::iterator> train_iter(n_batches);
+    vector<vector<TaggedBatch>::iterator> train_iter(n_batches);
     std::iota(train_iter.begin(), train_iter.end(), train_data.begin());
 
     //dy::SimpleSGDTrainer trainer(clf->p, opts.lr);
@@ -116,7 +126,7 @@ train(
             valid_acc = validate(clf, valid_data);
         }
 
-        auto training_loss = total_loss / n_train_sents;
+        auto training_loss = total_loss / n_train_toks;
 
         mlflow.log_metric("train_loss",   training_loss);
         mlflow.log_metric("valid_acc",    valid_acc);
@@ -185,7 +195,6 @@ int main(int argc, char** argv)
     SparseMAPOpts smap_opts;
     smap_opts.parse(argc, argv);
 
-    //bool is_gcn = gcn_opts.layers > 0;
     bool is_sparsemap = gcn_opts.get_tree() == GCNOpts::Tree::MST;
 
     if (opts.override_dy)
@@ -197,15 +206,16 @@ int main(int argc, char** argv)
     dy::initialize(dyparams);
 
     unsigned EMBED_DIM = 300;
+    unsigned HIDDEN_DIM = 300;
 
     std::stringstream vocab_fn, train_fn, valid_fn, test_fn, embed_fn, class_fn;
 
-    train_fn << "data/sentclf/" << clf_opts.dataset << ".train.txt";
-    valid_fn << "data/sentclf/" << clf_opts.dataset << ".valid.txt";
-    test_fn  << "data/sentclf/" << clf_opts.dataset << ".test.txt";
-    vocab_fn << "data/sentclf/" << clf_opts.dataset << ".vocab";
-    class_fn << "data/sentclf/" << clf_opts.dataset << ".classes";
-    embed_fn << "data/sentclf/" << clf_opts.dataset << ".embed";
+    train_fn << "data/tag/" << clf_opts.dataset << ".train";
+    valid_fn << "data/tag/" << clf_opts.dataset << ".valid";
+    test_fn  << "data/tag/" << clf_opts.dataset << ".test";
+    vocab_fn << "data/tag/" << clf_opts.dataset << ".vocab";
+    class_fn << "data/tag/" << clf_opts.dataset << ".classes";
+    embed_fn << "data/tag/" << clf_opts.dataset << ".embed";
 
     unsigned vocab_size = line_count(vocab_fn.str());
     cout << "vocabulary size: " << vocab_size << endl;
@@ -214,16 +224,22 @@ int main(int argc, char** argv)
     cout << "number of classes: " << n_classes << endl;
 
     dy::ParameterCollection params;
-    auto clf = std::make_unique<GCNSentClf>(
+    auto clf = std::make_unique<GCNTagger>(
         params,
         vocab_size,
         EMBED_DIM,
-        /* hidden dim*/ 300,
+        HIDDEN_DIM,
         n_classes,
         opts.dropout,
         gcn_opts,
         smap_opts.sm_opts);
-    clf->load_embeddings(embed_fn.str());
+
+    //clf->load_embeddings(embed_fn.str());
+    //
+    if (opts.test) {
+        test(clf, opts, valid_fn.str(), test_fn.str());
+        return 0;
+    }
 
     /* log mlflow run options */
     MLFlowRun mlflow(opts.mlflow_exp);
@@ -268,7 +284,7 @@ int main(int argc, char** argv)
     std::ostringstream fn;
     fn << opts.save_prefix
        << mlflow.run_uuid
-       << "_sentclf_"
+       << "_"
        << clf_opts.get_filename()
        << "_" << opts.get_filename()
        << "_" << gcn_opts.get_filename();
@@ -276,11 +292,6 @@ int main(int argc, char** argv)
     if (is_sparsemap)
         fn << smap_opts.get_filename();
 
-
-    if (opts.test)
-        test(clf, opts, test_fn.str());
-    else
-        train(clf, opts, fn.str(), train_fn.str(), valid_fn.str(), mlflow);
-
+    train(clf, opts, fn.str(), train_fn.str(), valid_fn.str(), mlflow);
     return 0;
 }

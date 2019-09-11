@@ -18,6 +18,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with AD3 2.1.  If not, see <http://www.gnu.org/licenses/>.
 
+#include <ostream>
 #include "ad3/GenericFactor.h"
 
 
@@ -125,7 +126,6 @@ class FactorTree : public GenericFactor
         return static_cast<Configuration>(heads);
     }
 
-  public:
     void Initialize(int length, const vector<std::tuple<int, int>>& arcs)
     {
         length_ = length;
@@ -135,6 +135,14 @@ class FactorTree : public GenericFactor
             std::tie(h, m) = arcs[k];
             index_arcs_[h][m] = k;
         }
+    }
+
+    virtual void
+    PrintConfiguration(std::ostream& out, const Configuration y) override
+    {
+        vector<int>* heads = static_cast<vector<int>*>(y);
+        for (auto && h : *heads)
+            out << h << " ";
     }
 
   private:

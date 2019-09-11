@@ -21,6 +21,14 @@ struct LabeledSentence
     size_t size() const { return sentence.size(); }
 };
 
+struct TaggedSentence
+{
+    Sentence sentence;
+    std::vector<unsigned> tags;
+
+    size_t size() const { return sentence.size(); }
+};
+
 struct NLIPair
 {
     Sentence prem;
@@ -33,9 +41,11 @@ struct NLIPair
 };
 
 typedef std::vector<LabeledSentence> SentBatch;
+typedef std::vector<TaggedSentence> TaggedBatch;
 typedef std::vector<NLIPair> NLIBatch;
 
 std::istream& operator>>(std::istream& in, LabeledSentence& data);
+std::istream& operator>>(std::istream& in, TaggedSentence& data);
 std::istream& operator>>(std::istream& in, NLIPair& data);
 
 

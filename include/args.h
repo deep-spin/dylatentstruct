@@ -19,6 +19,7 @@ struct TrainOpts : BaseOpts
     unsigned patience = 5;
     float lr = 1;
     float decay = 0.9;
+    float dropout = 0.1;
 
     std::string saved_model;
     std::string save_prefix = "./";
@@ -92,6 +93,12 @@ struct TrainOpts : BaseOpts
                 assert(i + 1 < argc);
                 mlflow_host = argv[i + 1];
                 i += 2;
+            } else if (arg == "--drop") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dropout;
+                i += 2;
             } else {
                 i += 1;
             }
@@ -107,6 +114,7 @@ struct TrainOpts : BaseOpts
           << "  Batch size: " << batch_size << '\n'
           << "          LR: " << lr << '\n'
           << "       Decay: " << decay << '\n'
+          << "     Dropout: " << dropout << '\n'
           << " MLFlow host: " << mlflow_host << '\n'
           << "  MLFlow exp: " << mlflow_exp << '\n'
           << "  MLFlow run: " << mlflow_name << '\n'
@@ -139,7 +147,7 @@ struct GCNOpts : BaseOpts
         LTR,
         GOLD,
         MST,
-        MST_CONSTR
+        MST_LSTM
     };
 
     Tree get_tree() const
@@ -152,6 +160,8 @@ struct GCNOpts : BaseOpts
             return Tree::GOLD;
         else if (tree_str == "mst")
             return Tree::MST;
+        else if (tree_str == "mst-lstm")
+            return Tree::MST_LSTM;
         else {
             std::cerr << "Invalid tree type." << std::endl;
             std::exit(EXIT_FAILURE);
@@ -162,7 +172,7 @@ struct GCNOpts : BaseOpts
     {
         auto tree = get_tree();
         return (tree == Tree::MST ||
-                tree == Tree::MST_CONSTR);
+                tree == Tree::MST_LSTM);
     }
 
     virtual void parse(int argc, char** argv)

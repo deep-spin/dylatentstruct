@@ -35,6 +35,42 @@ operator>>(std::istream& in, LabeledSentence& data)
 }
 
 std::istream&
+operator>>(std::istream& in, TaggedSentence& data)
+{
+    std::string sent_buf, ixs_buf, tags_buf, heads_buf;
+    std::getline(in, sent_buf, '\t');
+    std::getline(in, ixs_buf, '\t');
+    std::getline(in, tags_buf, '\t');
+    std::getline(in, heads_buf);
+
+    if (!in)  // failed
+        return in;
+
+    {
+        std::stringstream ixs(ixs_buf);
+        unsigned tmp;
+        while(ixs >> tmp)
+            data.sentence.word_ixs.push_back(tmp);
+    }
+
+    {
+        std::stringstream heads(heads_buf);
+        int tmp;
+        while(heads >> tmp)
+            data.sentence.heads.push_back(tmp);
+    }
+
+    {
+        std::stringstream tags(tags_buf);
+        int tmp;
+        while(tags >> tmp)
+            data.tags.push_back(tmp);
+    }
+
+    return in;
+}
+
+std::istream&
 operator>>(std::istream& in, NLIPair& data)
 {
     std::string target_buf;

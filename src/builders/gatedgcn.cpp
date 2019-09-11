@@ -69,6 +69,9 @@ GatedGCNBuilder::apply(const dy::Expression& input, const dy::Expression& graph)
 
             auto h_new = parents * graph + children * t_graph;
 
+            if (_training)
+                h_new = dy::dropout(h_new, dropout_rate);
+
             auto gate = dy::logistic(affine_transform(
               { ex.b_gate, ex.W_gate_old, h_old, ex.W_gate_new, h_new }));
 

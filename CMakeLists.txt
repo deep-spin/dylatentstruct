@@ -82,26 +82,32 @@ target_include_directories(
 )
 
 target_compile_options(dylatentstruct PUBLIC
-    -Ofast
+#    -Ofast
 #     -Werror
+    -O0
+    -g
     -Wall
     -Wextra
     -pedantic
     -funroll-loops
     -march=native)
 
-# add_executable(sentclf src/sentclf.cpp)
-add_executable(esim src/esim.cpp)
-add_executable(decomp src/decomp.cpp)
-add_executable(listops src/listops.cpp)
+add_executable(sentclf src/sentclf.cpp)
+add_executable(tagger src/tagger.cpp)
+#add_executable(esim src/esim.cpp)
+#add_executable(decomp src/decomp.cpp)
+#add_executable(listops src/listops.cpp)
 add_executable(check src/check.cpp)
 add_executable(test-arcs-to-adj src/test-arcs-to-adj.cpp)
+add_executable(test-mrt src/test-mrt.cpp)
 # add_executable(mlflowtest src/mlflowtest.cpp)
 
-#target_link_libraries(sentclf PUBLIC dylatentstruct)
-target_link_libraries(esim PUBLIC dylatentstruct)
-target_link_libraries(decomp PUBLIC dylatentstruct)
-target_link_libraries(listops PUBLIC dylatentstruct)
+target_link_libraries(sentclf PUBLIC dylatentstruct)
+target_link_libraries(tagger PUBLIC dylatentstruct)
+#target_link_libraries(esim PUBLIC dylatentstruct)
+#target_link_libraries(decomp PUBLIC dylatentstruct)
+#target_link_libraries(listops PUBLIC dylatentstruct)
 #target_link_libraries(mlflowtest PUBLIC dylatentstruct)
 target_link_libraries(test-arcs-to-adj PUBLIC dylatentstruct)
+target_link_libraries(test-mrt PUBLIC dylatentstruct)
 target_link_libraries(check PUBLIC dylatentstruct)

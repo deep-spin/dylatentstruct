@@ -1,8 +1,9 @@
 #include "builders/adjmatrix.h"
 #include "factors/FactorTree.h"
+#include "layers/arcs-to-adj.h"
+
 #include <dynet/devices.h>
 
-#include "layers/arcs-to-adj.h"
 
 dy::Expression
 make_fixed_adj(dy::ComputationGraph& cg, const std::vector<unsigned>& heads)
@@ -14,9 +15,7 @@ make_fixed_adj(dy::ComputationGraph& cg, const std::vector<unsigned>& heads)
     for (size_t i = 0; i < n; ++i)
         data[(1 + n) * (1 + i) + heads[i]] = 1;
     auto U = dy::input(*cg_, {1 + n, 1 + n}, data);
-    */
-
-    // sparse
+    */ // sparse
     std::vector<float> data(n, 1.0f);
     std::vector<unsigned int> ixs(n);
 
@@ -41,7 +40,7 @@ TreeAdjacency::make_adj_pair(const std::vector<dy::Expression>& enc_prem,
 }
 
 void
-FixedAdjacency::new_graph(dy::ComputationGraph& cg)
+FixedAdjacency::new_graph(dy::ComputationGraph& cg, bool)
 {
     cg_ = &cg;
 }
@@ -60,7 +59,6 @@ FlatAdjacency::make_adj(const std::vector<dy::Expression>&,
     std::vector<unsigned> nonneg_heads(n, 0);
     return make_fixed_adj(nonneg_heads);
 }
-
 dy::Expression
 LtrAdjacency::make_adj(const std::vector<dy::Expression>&, const Sentence& sent)
 {
@@ -93,7 +91,7 @@ MSTAdjacency::MSTAdjacency(dy::ParameterCollection& params,
 {}
 
 void
-MSTAdjacency::new_graph(dy::ComputationGraph& cg)
+MSTAdjacency::new_graph(dy::ComputationGraph& cg, bool)
 {
     cg_ = &cg;
     scorer.new_graph(cg);
@@ -150,128 +148,37 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     //fg->SetVerbosity(10);
     auto u_cpu = dy::sparsemap(scores_cpu, std::move(fg), opts);
     u_cpu = dy::arcs_to_adj(u_cpu, sz);
-
-    /*
-    //u_cpu = dy::reshape(u_cpu, { u_cpu.dim()[1] });
-    auto zero = dy::input(*cg_, 0.0, cpu);
-    auto u_cpu_ = dy::concatenate({ zero, u_cpu });
-    u_cpu_ = dy::select_rows(u_cpu_, reverse_ixs);
-    u_cpu_ = dy::reshape(u_cpu_, {sz, sz});
-
-    std::cout << u_cpu_.dim() << std::endl;
-    std::cout << u_cpu_.value() << std::endl;
-    std::cout << sz << std::endl << std::endl;;
-
-    auto f = dy::arcs_to_adj(u_cpu, sz);
-    std::cout << f.dim() << std::endl;
-    std::cout << f.value() << std::endl;
-
-    std::cout << u_cpu_.value() << std::endl;
-    std::abort();
-    */
-
     auto u = dy::to_device(u_cpu, device);
     return u;
 }
 
 MSTLSTMAdjacency::MSTLSTMAdjacency(dy::ParameterCollection& params,
                                    const dy::SparseMAPOpts& opts,
-                                   unsigned hidden_dim)
-  : MSTAdjacency{ params, opts, hidden_dim }
-  , lstm{ /*layers=*/1, hidden_dim, hidden_dim, params }
+                                   unsigned hidden_dim,
+                                   float dropout_p,
+                                   int budget)
+  : MSTAdjacency{ params, opts, hidden_dim, /*dist=*/false,  budget}
+  , bilstm_settings{ /*stacks=*/1, /*layers=*/1, hidden_dim / 2 }
+  , bilstm{ params, bilstm_settings, hidden_dim }
+  , dropout_p{ dropout_p }
 {}
 
 void
-MSTLSTMAdjacency::new_graph(dy::ComputationGraph& cg)
+MSTLSTMAdjacency::new_graph(dy::ComputationGraph& cg, bool training)
 {
-    MSTAdjacency::new_graph(cg);
-    lstm.new_graph(cg, /*update=*/true);
+    MSTAdjacency::new_graph(cg, training);
+    bilstm.new_graph(cg, training, /*update=*/true);
+    if (training)
+        bilstm.set_dropout(dropout_p);
+    else
+        bilstm.disable_dropout();
 }
 
 dy::Expression
 MSTLSTMAdjacency::make_adj(const std::vector<dy::Expression>& enc,
                            const Sentence& sentence)
 {
-    lstm.start_new_sequence();
-    auto sz = enc.size();
-    std::vector<dy::Expression> lstm_out(sz);
-    for (auto i = 0u; i < sz; ++i)
-        lstm_out.at(i) = lstm.add_input(enc.at(i));
-
-    return MSTAdjacency::make_adj(lstm_out, sentence);
-}
-
-
-MSTLSTMConstrAdjacency::MSTLSTMConstrAdjacency(dy::ParameterCollection& params,
-                                               const dy::SparseMAPOpts& opts,
-                                               unsigned hidden_dim,
-                                               int budget)
-  : MSTLSTMAdjacency{ params, opts, hidden_dim }
-  , budget(budget)
-{}
-
-void
-MSTLSTMConstrAdjacency::new_graph(dy::ComputationGraph& cg)
-{
-    MSTLSTMAdjacency::new_graph(cg);
-}
-
-
-dy::Expression
-MSTLSTMConstrAdjacency::make_adj(const std::vector<dy::Expression>& enc,
-                                 const Sentence&)
-{
-    lstm.start_new_sequence();
-    auto sz = enc.size();
-    std::vector<dy::Expression> lstm_out(sz);
-    for (auto i = 0u; i < sz; ++i)
-        lstm_out.at(i) = lstm.add_input(enc.at(i));
-
-    auto fg = std::make_unique<AD3::FactorGraph>();
-    std::vector<AD3::BinaryVariable*> vars;
-    std::vector<std::tuple<int, int>> arcs;
-
-    if (sz > 385) { // 99th percentile: use flat
-        std::vector<unsigned> nonneg_heads(sz - 1, 0);
-        return ::make_fixed_adj(*cg_, nonneg_heads);
-    }
-
-    unsigned k = 1;
-
-    std::vector<std::vector<AD3::BinaryVariable*>> kids(sz);
-
-    for (size_t m = 1; m < sz; ++m) {
-        for (size_t h = 0; h < sz; ++h) {
-            if (h != m) {
-                arcs.push_back(std::make_tuple(h, m));
-                auto var = fg->CreateBinaryVariable();
-                vars.push_back(var);
-                kids.at(h).push_back(var);
-                ++k;
-            }
-        }
-    }
-
-    // ugly transfer of ownership, as in AD3. How to be safer?
-    AD3::Factor* tree_factor = new AD3::FactorTree;
-    fg->DeclareFactor(tree_factor, vars, /*pass_ownership=*/true);
-    static_cast<AD3::FactorTree*>(tree_factor)->Initialize(sz, arcs);
-
-    for (size_t h = 0; h < sz; ++h)
-        fg->CreateFactorBUDGET(kids.at(h), budget, /*own=*/true);
-
-    auto scores = scorer.make_potentials(enc);
-    const auto device_name = scores.get_device_name();
-    auto* device = dy::get_device_manager()->get_global_device(device_name);
-    auto* cpu = dy::get_device_manager()->get_global_device("CPU");
-    auto scores_cpu_matrix = dy::to_device(scores, cpu);
-    auto scores_cpu = dy::adj_to_arcs(scores_cpu_matrix);
-
-    //fg->SetVerbosity(10);
-    auto u_cpu = dy::sparsemap(scores_cpu, std::move(fg), opts);
-    u_cpu = dy::arcs_to_adj(u_cpu, sz);
-
-    auto u = dy::to_device(u_cpu, device);
-    return u;
+    auto bilstm_out = bilstm(enc);
+    return MSTAdjacency::make_adj(bilstm_out, sentence);
 }
 

@@ -1,126 +1,96 @@
-/* Author: Caio Corro
- * License: MIT
- * Part of https://github.com/FilippoC/dynet-tools/
- */
-
 #include <dynet/param-init.h>
 
 #include "builders/gcn.h"
 
 namespace dy = dynet;
 
-GCNBuilder::GCNBuilder(dy::ParameterCollection& pc,
-                       const GCNSettings& settings,
-                       unsigned dim_input)
-  : settings(settings)
-  , local_pc(pc.add_subcollection("gcn"))
-  , e_W_parents(settings.layers)
-  , e_b_parents(settings.layers)
-  , e_W_children(settings.layers)
-  , e_b_children(settings.layers)
-  , e_W_self(settings.layers)
-  , e_b_self(settings.layers)
-{
-    unsigned last = dim_input;
-    for (unsigned i = 0; i < settings.layers; ++i) {
-        p_W_parents.push_back(local_pc.add_parameters({ settings.dim, last }));
-        p_b_parents.push_back(local_pc.add_parameters(
-          { settings.dim }, dy::ParameterInitConst(0.f)));
-        p_W_children.push_back(local_pc.add_parameters({ settings.dim, last }));
-        p_b_children.push_back(local_pc.add_parameters(
-          { settings.dim }, dy::ParameterInitConst(0.f)));
-        p_W_self.push_back(local_pc.add_parameters({ settings.dim, last }));
-        p_b_self.push_back(local_pc.add_parameters(
-          { settings.dim }, dy::ParameterInitConst(0.f)));
+GCNParams::GCNParams(dy::ParameterCollection& pc, unsigned dim_in, unsigned dim_out)
+  : W_parents{ pc.add_parameters({ dim_out, dim_in }, 0, "W-parents") }
+  , b_parents{ pc.add_parameters({ dim_out }, 0, "b-parents") }
+  , W_children{ pc.add_parameters({ dim_out, dim_in }, 0, "W-children") }
+  , b_children{ pc.add_parameters({ dim_out }, 0, "b-children") }
+  , W_self{ pc.add_parameters({ dim_out, dim_in }, 0, "W-self") }
+  , b_self{ pc.add_parameters({ dim_out }, 0, "b-self") }
+{}
 
-        if (settings.dense)
-            last = settings.dim + last;
+GCNExprs::GCNExprs(dy::ComputationGraph& cg, GCNParams params)
+{
+    W_parents = dy::parameter(cg, params.W_parents);
+    b_parents = dy::parameter(cg, params.b_parents);
+    W_children = dy::parameter(cg, params.W_children);
+    b_children = dy::parameter(cg, params.b_children);
+    W_self = dy::parameter(cg, params.W_self);
+    b_self = dy::parameter(cg, params.b_self);
+}
+
+GCNBuilder::GCNBuilder(dy::ParameterCollection& pc,
+                       unsigned n_layers,
+                       unsigned dim_in,
+                       unsigned dim_out,
+                       bool dense)
+  : local_pc(pc.add_subcollection("gcn"))
+  , exprs{ n_layers }
+  , n_layers{ n_layers }
+  , dense{ dense }
+{
+    params.reserve(n_layers);
+    unsigned dim = dim_in;
+    for (unsigned i = 0; i < n_layers; ++i) {
+        params.push_back(GCNParams(local_pc, dim, dim_out));
+
+        if (dense)
+            dim = dim_in + dim_out;
         else
-            last = settings.dim;
+            dim = dim_out;
     }
-    _output_rows = last;
 
     std::cerr << "Graph Convolutional Network\n"
-              << " layers: " << settings.layers << "\n"
-              << " dim: " << settings.dim << "\n"
+              << " layers: " << n_layers << "\n"
               << std::endl;
 }
 
 void
-GCNBuilder::new_graph(dy::ComputationGraph& cg, bool training, bool update)
+GCNBuilder::new_graph(dy::ComputationGraph& cg, bool training)
 {
     _training = training;
-    for (unsigned i = 0; i < settings.layers; ++i) {
-        if (update) {
-            e_W_parents.at(i) = dy::parameter(cg, p_W_parents.at(i));
-            e_b_parents.at(i) = dy::parameter(cg, p_b_parents.at(i));
-            e_W_children.at(i) = dy::parameter(cg, p_W_children.at(i));
-            e_b_children.at(i) = dy::parameter(cg, p_b_children.at(i));
-            e_W_self.at(i) = dy::parameter(cg, p_W_self.at(i));
-            e_b_self.at(i) = dy::parameter(cg, p_b_self.at(i));
-        } else {
-            e_W_parents.at(i) = dy::const_parameter(cg, p_W_parents.at(i));
-            e_b_parents.at(i) = dy::const_parameter(cg, p_b_parents.at(i));
-            e_W_children.at(i) = dy::const_parameter(cg, p_W_children.at(i));
-            e_b_children.at(i) = dy::const_parameter(cg, p_b_children.at(i));
-            e_W_self.at(i) = dy::const_parameter(cg, p_W_self.at(i));
-            e_b_self.at(i) = dy::const_parameter(cg, p_b_self.at(i));
-        }
-    }
+    for (unsigned i = 0; i < n_layers; ++i)
+        exprs.at(i) = GCNExprs(cg, params.at(i));
 }
 
 dy::Expression
 GCNBuilder::apply(const dy::Expression& input, const dy::Expression& graph)
 {
-    if (settings.layers == 0)
+    using dy::affine_transform;
+
+    if (n_layers == 0)
         return input;
 
     auto t_graph = dy::transpose(graph);
-    auto last = input;
-    for (unsigned i = 0u; i < settings.layers; ++i) {
+    auto h = input;
+    for (auto i = 0u; i < n_layers; ++i) {
+        auto ex = exprs.at(i);
 
-        auto current = dy::affine_transform(
-          { e_b_self.at(i), e_W_self.at(i), last });
-
-        auto parents = dy::affine_transform(
-          { e_b_parents.at(i), e_W_parents.at(i), last });
-
-        auto children = dy::affine_transform(
-          { e_b_children.at(i), e_W_children.at(i), last });
-
-        auto hid = current + parents * graph + children * t_graph;
+        auto self = affine_transform({ ex.b_self, ex.W_self, h });
+        auto parents = affine_transform({ ex.b_parents, ex.W_parents, h });
+        auto children = affine_transform({ ex.b_children, ex.W_children, h });
+        auto h_next = self + parents * graph + children * t_graph;
 
         if (_training)
-            hid = dy::dropout(hid, dropout_rate);
+            h_next = dy::dropout(h_next, dropout_rate);
 
-        //if (dropout_rate > 0.f) {
-            //if (_training) {
-                //hid = dy::dropout(hid, dropout_rate);
-            //} else {
-                //// because of dy bug
-                //hid = dy::dropout(hid, 0.f);
-            //}
-        //}
+        h_next = dy::rectify(h_next);
 
-        hid = dy::rectify(hid);
-
-        if (settings.dense)
-            last = dy::concatenate({ hid, last });
+        if (dense)
+            h = dy::concatenate({ h, h_next });
         else
-            last = hid;
+            h = h_next;
     }
 
-    return last;
+    return h;
 }
 
 void
 GCNBuilder::set_dropout(float value)
 {
     dropout_rate = value;
-}
-
-unsigned
-GCNBuilder::output_rows() const
-{
-    return _output_rows;
 }

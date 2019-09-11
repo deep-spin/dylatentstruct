@@ -21,13 +21,6 @@ long milliseconds_since_epoch()
 
 struct MLFlowRun
 {
-    std::string hostname;
-    std::string port;
-    unsigned exp_id;
-
-    std::string run_uuid;
-
-    const std::string user_id = "vlad";
 
     MLFlowRun(
         unsigned exp_id,
@@ -50,11 +43,21 @@ struct MLFlowRun
                            cpr::Header{{"Content-Type", "application/json"}},
                            cpr::Body{payload.dump()});
 
+        if (r.status_code != 200) {
+            std::cerr << "Warning: could not connect to MLFlow server. "
+                      << "Status code: " << r.status_code << ", "
+                      << "Response: " << r.text << std::endl;
+            return;
+        }
+
         auto jr = json::parse(r.text);
+
         run_uuid = jr["run"]["info"]["run_uuid"];
 
         //set_tag("mlflow.source.type", "PROJECT");
         //set_tag("mlflow.source.git.commit", GIT_COMMIT);
+
+        connected = true;
     };
 
     cpr::Url get_url(const std::string& path)
@@ -70,6 +73,9 @@ struct MLFlowRun
     void set_tag(const std::string& key, const std::string& val)
     const
     {
+        if (!connected)
+            return;
+
         auto payload = json{
             {"run_uuid", run_uuid},
             {"key", key},
@@ -83,6 +89,9 @@ struct MLFlowRun
     void log_parameter(const std::string& key, const std::string& val)
     const
     {
+        if (!connected)
+            return;
+
         auto payload = json{
             {"run_uuid", run_uuid},
             {"key", key},
@@ -96,6 +105,9 @@ struct MLFlowRun
     void log_metric(const std::string& key, const double& val)
     const
     {
+        if (!connected)
+            return;
+
         auto payload = json{
             {"run_uuid", run_uuid},
             {"timestamp", milliseconds_since_epoch()},
@@ -106,5 +118,13 @@ struct MLFlowRun
                            cpr::Header{{"Content-Type", "application/json"}},
                            cpr::Body{payload.dump()});
     }
+
+    const std::string user_id = "vlad";
+    bool connected = false;
+
+    std::string hostname;
+    std::string port;
+    unsigned exp_id;
+    std::string run_uuid;
 
 };

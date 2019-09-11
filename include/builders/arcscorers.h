@@ -1,5 +1,5 @@
-
 #pragma once
+
 #include <dynet/expr.h>
 #include <dynet/model.h>
 
@@ -25,7 +25,7 @@ struct BilinearScoreBuilder : public ArcScoreBuilder
     //dy::Expression W;
     //dy::Expression root;
 
-    explicit BilinearScoreBuilder(dy::ParameterCollection params,
+    explicit BilinearScoreBuilder(dy::ParameterCollection& params,
                                   unsigned hidden_dim,
                                   unsigned input_dim)
       : p(params.add_subcollection("bilinear-scorer"))
@@ -75,7 +75,7 @@ struct MLPScoreBuilder : public ArcScoreBuilder
     dy::Expression v;
     dy::Expression b;
 
-    explicit MLPScoreBuilder(dy::ParameterCollection params,
+    explicit MLPScoreBuilder(dy::ParameterCollection& params,
                              unsigned hidden_dim,
                              unsigned input_dim)
       : p(params.add_subcollection("mlp-scorer"))
