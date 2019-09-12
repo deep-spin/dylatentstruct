@@ -4,7 +4,8 @@ bs=64
 lr=0.0005
 drop=.33
 
-ds=en_ewt
+#ds=en_ewt
+ds=de_gsd
 
 # tree=mst-lstm
 tree=ltr
@@ -27,7 +28,7 @@ build/tagger --dataset ${ds} \
              --patience 5 \
              --lr ${lr} \
              --save-prefix models/tag_${ds} \
-             --mlflow-experiment 11 \
+             --mlflow-experiment 12 \
              --mlflow-host 193.136.221.135 \
              --mlflow-name tag-${tree}-${layers} \
              --sparsemap-eta 0 \

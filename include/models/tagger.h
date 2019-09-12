@@ -82,17 +82,19 @@ struct GCNTagger : public BaseEmbedModel
 
         auto cm = ConfusionMatrix{ n_classes_ };
 
-        auto outc = dy::concatenate_cols(predict_batch(cg, batch));
-        cg.incremental_forward(outc);
-        auto out = outc.value();
+        auto out = predict_batch(cg, batch);
+        auto outc = dy::concatenate_cols(out);
+        auto outval = outc.value();
         auto i = 0;
-        auto pred = dy::as_vector(dy::TensorTools::argmax(out));
+        auto pred = dy::as_vector(dy::TensorTools::argmax(outval));
+
         for (auto && sent : batch) {
             for (auto && y_true : sent.tags) {
                 cm.insert(y_true, pred[i]);
                 i += 1;
             }
         }
+
         return cm;
     }
 

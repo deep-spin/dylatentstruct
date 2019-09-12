@@ -67,6 +67,12 @@ operator>>(std::istream& in, TaggedSentence& data)
             data.tags.push_back(tmp);
     }
 
+    if (data.sentence.size() != data.tags.size()) {
+        std::cerr << "Error: mismatched tag length in sentence " << sent_buf
+                  << std::endl;
+        std::abort();
+    }
+
     return in;
 }
 
