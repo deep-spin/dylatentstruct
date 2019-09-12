@@ -12,6 +12,7 @@
 
 #include "utils.h"
 #include "data.h"
+#include "evaluation.h"
 #include "args.h"
 #include "mlflow.h"
 #include "crayon.h"
@@ -25,22 +26,18 @@ using std::cout;
 using std::endl;
 
 
-float
-validate(
+ConfusionMatrix validate(
     std::unique_ptr<GCNTagger>& clf,
     const vector<TaggedBatch>& data)
 {
-    int n_correct = 0;
-    int n_total = 0;
+    auto cm = ConfusionMatrix { clf->n_classes_ };
     for (auto&& valid_batch : data)
     {
         dy::ComputationGraph cg;
-        n_correct += clf->n_correct(cg, valid_batch);
-        for (auto&& sent : valid_batch)
-            n_total += sent.size();
+        cm += clf->confusion_matrix(cg, valid_batch);
     }
 
-    return float(n_correct) / n_total;
+    return cm;
 }
 
 
@@ -55,13 +52,18 @@ test(
 
     clf->tree->set_print(opts.saved_model + "valid-trees.txt");
     auto valid_data = read_batches<TaggedSentence>(valid_fn, opts.batch_size);
-    float valid_acc = validate(clf, valid_data);
-    cout << "Valid accuracy: " << valid_acc << endl;
+    auto valid_cm = validate(clf, valid_data);
+
+    std::cout << valid_cm << std::endl;
+
+    cout << "Valid accuracy: " << valid_cm.accuracy() << endl;
+    auto valid_prf = valid_cm.precision_recall_f1();
+    cout << "Valid F1: " << valid_prf.average_fscore() << endl;
 
     clf->tree->set_print(opts.saved_model + "test-trees.txt");
     auto test_data = read_batches<TaggedSentence>(test_fn, opts.batch_size);
-    float test_acc = validate(clf, test_data);
-    cout << "Test accuracy: " << test_acc << endl;
+    auto test_cm = validate(clf, test_data);
+    cout << "Test accuracy: " << test_cm.accuracy() << endl;
 }
 
 
@@ -91,11 +93,11 @@ train(
 
     //dy::SimpleSGDTrainer trainer(clf->p, opts.lr);
     dy::AdamTrainer trainer(clf->p, opts.lr);
-    trainer.clip_threshold = 100;
-    trainer.sparse_updates_enabled = false;
+    // trainer.clip_threshold = 100;
+    // trainer.sparse_updates_enabled = false;
 
-    float best_valid_acc = 0;
-    float last_valid_acc = 0;
+    float best_valid_f1 = 0;
+    float last_valid_f1 = 0;
     unsigned impatience = 0;
 
     Crayon crayon(out_fn);
@@ -114,32 +116,43 @@ train(
                 dy::ComputationGraph cg;
                 auto loss = clf->batch_loss(cg, *batch);
                 auto lossval = dy::as_scalar(cg.incremental_forward(loss));
-                total_loss += lossval;
+                total_loss += batch->size() * lossval;
                 cg.backward(loss);
                 trainer.update();
             }
         }
 
-        float valid_acc;
+        auto cm = ConfusionMatrix{ clf->n_classes_ };
         {
             std::unique_ptr<dy::Timer> timer(new dy::Timer("valid took"));
-            valid_acc = validate(clf, valid_data);
+            cm = validate(clf, valid_data);
         }
 
         auto training_loss = total_loss / n_train_toks;
+        auto valid_acc = cm.accuracy();
+        auto valid_prf = cm.precision_recall_f1();
+        auto valid_f1 = valid_prf.average_fscore();
 
         mlflow.log_metric("train_loss",   training_loss);
         mlflow.log_metric("valid_acc",    valid_acc);
+        mlflow.log_metric("valid_f1",     valid_f1);
         mlflow.log_metric("effective_lr", trainer.learning_rate);
 
         crayon.log_metric("train_loss",   training_loss, 1 + it);
         crayon.log_metric("valid_acc",    valid_acc, 1 + it);
+        crayon.log_metric("valid_acc",    valid_f1, 1 + it);
         crayon.log_metric("effective_lr", trainer.learning_rate, 1 + it);
 
+        std::cout << "Per-class f-scores\n";
+        for (auto && fsc : valid_prf.fscore)
+            std::cout << '\t' << fsc << '\n';
         std::cout << "training loss " << training_loss
-                  << " valid accuracy " << valid_acc << std::endl;
+                  << " valid accuracy " << valid_acc
+                  << " valid avg F1 " << valid_f1
+                  << std::endl;
 
-        if ((valid_acc + 0.0001) > last_valid_acc)
+
+        if ((valid_f1 + 0.0001) > last_valid_f1)
         {
             impatience = 0;
         }
@@ -150,16 +163,16 @@ train(
             impatience += 1;
         }
 
-        if (valid_acc > best_valid_acc)
+        if (valid_f1 > best_valid_f1)
         {
-            best_valid_acc = valid_acc;
+            best_valid_f1 = valid_f1;
 
             std::ostringstream fn;
             fn << out_fn
                << "_acc_"
                << std::internal << std::setfill('0')
                << std::fixed << std::setprecision(2) << std::setw(5)
-               << valid_acc * 100.0
+               << valid_f1 * 100.0
                << "_iter_" << std::setw(3) << it
                << ".dy";
             clf->save(fn.str());
@@ -170,9 +183,9 @@ train(
             cout << opts.patience << " epochs without improvement." << endl;
             break;
         }
-        last_valid_acc = valid_acc;
+        last_valid_f1 = valid_f1;
     }
-    mlflow.log_metric("best_valid_acc", best_valid_acc);
+    mlflow.log_metric("best_valid_f1", best_valid_f1);
 }
 
 

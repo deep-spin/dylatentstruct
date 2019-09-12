@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "data.h"
+#include "evaluation.h"
 
 #include "builders/adjmatrix.h"
 //#include "builders/gatedgcn.h"
@@ -33,7 +34,7 @@ struct GCNTagger : public BaseEmbedModel
         unsigned vocab_size,
         unsigned embed_dim,
         unsigned hidden_dim,
-        unsigned n_classes,
+        int n_classes,
         float dropout,
         const GCNOpts& gcn_opts,
         const dy::SparseMAPOpts& smap_opts)
@@ -43,8 +44,9 @@ struct GCNTagger : public BaseEmbedModel
             embed_dim,
             /*update_embed=*/true,
             "sentclf"}
-        , p_out_W{p.add_parameters({n_classes, 2 * hidden_dim}) }
-        , p_out_b{p.add_parameters({n_classes}) }
+        , p_out_W{p.add_parameters({ (unsigned) n_classes,
+                                     (gcn_opts.layers + 1) * hidden_dim}) }
+        , p_out_b{p.add_parameters({ (unsigned) n_classes}) }
         //, gcn{ p, gcn_opts.layers, gcn_opts.iter, hidden_dim }
         , gcn{ p, gcn_opts.layers, hidden_dim, hidden_dim, true }
         , gcn_opts_{ gcn_opts }
@@ -72,6 +74,26 @@ struct GCNTagger : public BaseEmbedModel
             std::cerr << "Not implemented";
             std::abort();
         }
+    }
+
+    ConfusionMatrix
+    confusion_matrix(ComputationGraph& cg, const TaggedBatch& batch) {
+        set_test_time();
+
+        auto cm = ConfusionMatrix{ n_classes_ };
+
+        auto outc = dy::concatenate_cols(predict_batch(cg, batch));
+        cg.incremental_forward(outc);
+        auto out = outc.value();
+        auto i = 0;
+        auto pred = dy::as_vector(dy::TensorTools::argmax(out));
+        for (auto && sent : batch) {
+            for (auto && y_true : sent.tags) {
+                cm.insert(y_true, pred[i]);
+                i += 1;
+            }
+        }
+        return cm;
     }
 
     virtual
@@ -126,7 +148,7 @@ struct GCNTagger : public BaseEmbedModel
             }
         }
 
-        return dy::sum(losses);
+        return dy::average(losses);
     }
 
     virtual
@@ -199,6 +221,6 @@ struct GCNTagger : public BaseEmbedModel
 
     GCNOpts gcn_opts_;
     unsigned hidden_dim_;
-    unsigned n_classes_;
+    int n_classes_;
     float dropout_;
 };
