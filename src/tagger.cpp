@@ -255,7 +255,7 @@ int main(int argc, char** argv)
     }
 
     /* log mlflow run options */
-    MLFlowRun mlflow(opts.mlflow_exp);
+    MLFlowRun mlflow(opts.mlflow_exp, opts.mlflow_host);
 
     mlflow.set_tag("mlflow.runName", opts.mlflow_name);
 
