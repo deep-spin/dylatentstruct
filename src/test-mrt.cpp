@@ -19,10 +19,12 @@ int main(int argc, char** argv)
     dy::ParameterCollection params;
     auto emb = params.add_lookup_parameters(vocab_size, { embed_dim });
 
+    int budget = 3;
     dy::SparseMAPOpts opts;
-    //opts.eta = 0;
+    opts.eta = 0.01;
     //opts.max_iter = 1;
-    //opts.max_active_set_iter = 50;
+    opts.max_active_set_iter = 50;
+    opts.log_stream = std::make_shared<std::ofstream>("log.txt");
 
     auto sent = Sentence{};
     sent.word_ixs.push_back(1);
@@ -44,11 +46,11 @@ int main(int argc, char** argv)
     std::cout << std::endl;
 
     //auto tree = MSTLSTMAdjacency{ params, opts, embed_dim };
-    auto tree = MSTAdjacency{ params, opts, embed_dim, false, 0 };
+    auto tree = MSTAdjacency{ params, opts, embed_dim, false, budget };
 
     dy::AdamTrainer trainer(params, 0.01);
 
-    const auto n_iter = 20;
+    const auto n_iter = 30;
 
     for (auto i = 0u; i < n_iter; ++i) {
 
@@ -75,7 +77,7 @@ int main(int argc, char** argv)
 
         auto loss = dy::squared_distance(y_true, out);
         cg.forward(loss);
-        std::cout << loss.value() << std::endl;
+        std::cout << "iter " << i << " loss " <<  loss.value() << std::endl;
         cg.backward(loss);
         trainer.update();
     }
