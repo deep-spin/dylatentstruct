@@ -208,7 +208,7 @@ int main(int argc, char** argv)
     SparseMAPOpts smap_opts;
     smap_opts.parse(argc, argv);
 
-    bool is_sparsemap = gcn_opts.get_tree() == GCNOpts::Tree::MST;
+    bool is_sparsemap = gcn_opts.is_sparsemap();
 
     if (opts.override_dy)
     {
@@ -274,6 +274,7 @@ int main(int argc, char** argv)
     mlflow.log_parameter("gcn_layers",  std::to_string(gcn_opts.layers));
     mlflow.log_parameter("gcn_iter",    std::to_string(gcn_opts.iter));
     mlflow.log_parameter("gcn_dropout", std::to_string(gcn_opts.dropout));
+    mlflow.log_parameter("gcn_budget",  std::to_string(gcn_opts.budget));
 
     mlflow.log_parameter("fn_prefix",   opts.save_prefix);
 

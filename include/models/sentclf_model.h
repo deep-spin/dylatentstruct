@@ -5,11 +5,12 @@
 #include <dynet/lstm.h>
 #include <dynet/tensor.h>
 #include <dynet/index-tensor.h>
+#include <dynet/param-init.h>
 
 #include "data.h"
 #include "models/basemodel.h"
-//#include "builders/gcn.h"
-#include "builders/gatedgcn.h"
+#include "builders/gcn.h"
+//#include "builders/gatedgcn.h"
 #include "builders/adjmatrix.h"
 
 #include <vector>
@@ -47,11 +48,16 @@ struct GCNSentClf : public BaseEmbedModel
             embed_dim,
             /*update_embed=*/true,
             "sentclf"}
-        , p_out_W{p.add_parameters({n_classes, hidden_dim}) }
-        , p_out_b{p.add_parameters({n_classes}) }
-        , gcn{ p, gcn_opts.layers, gcn_opts.iter, hidden_dim }
-        //, gcn{ p, gcn_opts.layers, hidden_dim, hidden_dim, false }
-        , gcn_opts_{ gcn_opts }
+        , pooled_dim{ (gcn_opts.layers + 1) * hidden_dim }
+        , p_out_W{ p.add_parameters({ n_classes, pooled_dim } ) }
+        , p_out_b{ p.add_parameters({ n_classes }) }
+        , layer_norm_g_p{ p.add_parameters({ pooled_dim },
+                                           dy::ParameterInitConst(1.0f)) }
+        , layer_norm_b_p{ p.add_parameters({ pooled_dim },
+                                           dy::ParameterInitConst(0.0f)) }
+        //, gcn{ p, gcn_opts.layers, gcn_opts.iter, hidden_dim }
+        , gcn{ p, gcn_opts.layers, hidden_dim, hidden_dim, true }
+        //, gcn_opts_{ gcn_opts }
         , hidden_dim_{ hidden_dim }
         , n_classes_{ n_classes }
         , dropout_{ dropout }
@@ -68,7 +74,10 @@ struct GCNSentClf : public BaseEmbedModel
             tree = std::make_unique<CustomAdjacency>();
         else if (tree_type == GCNOpts::Tree::MST)
             tree = std::make_unique<MSTAdjacency>(
-              p, smap_opts, hidden_dim, false, 0);
+              p, smap_opts, hidden_dim, false, gcn_opts_.budget);
+        else if (tree_type == GCNOpts::Tree::MST_LSTM)
+            tree = std::make_unique<MSTLSTMAdjacency>(
+              p, smap_opts, hidden_dim, dropout_, gcn_opts_.budget);
         else {
             std::cerr << "Not implemented";
             std::abort();
@@ -148,15 +157,15 @@ struct GCNSentClf : public BaseEmbedModel
             auto X = dy::concatenate_cols(ctx);
             auto res = gcn.apply(X, G);
 
-            auto h = dy::mean_dim(res, {1});
-            //auto h = dy::max_dim(res, 1);
-            //auto h = dy::concatenate({
-                //dy::max_dim(res, 1)
-            //});
+            auto h = dy::sum_dim(res, {1});
 
-            // dropout h
-            if (training_)
-                h = dy::dropout(h, dropout_);
+            // apply simple layer norm
+            auto layer_norm_g = parameter(cg, layer_norm_g_p);
+            auto layer_norm_b = parameter(cg, layer_norm_b_p);
+            h = dy::layer_norm(h, layer_norm_g, layer_norm_b);
+
+            //if (training_)
+                //h = dy::dropout(h, dropout_);
 
             h = dy::affine_transform({out_b, out_W, h});
             out.push_back(h);
@@ -181,11 +190,16 @@ struct GCNSentClf : public BaseEmbedModel
         gcn.set_dropout( 0.0f );
     }
 
+
+    unsigned pooled_dim;
+
     dy::Parameter p_out_W;
     dy::Parameter p_out_b;
+    dy::Parameter layer_norm_g_p;
+    dy::Parameter layer_norm_b_p;
 
-    //GCNBuilder gcn;
-    GatedGCNBuilder gcn;
+    GCNBuilder gcn;
+    //GatedGCNBuilder gcn;
     std::unique_ptr<TreeAdjacency> tree;
 
     GCNOpts gcn_opts_;
