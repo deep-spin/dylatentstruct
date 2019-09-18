@@ -136,16 +136,22 @@ struct GCNTagger : public BaseEmbedModel
         auto out = predict_batch(cg, batch);
         vector<Expression> losses;
 
+        auto append_loss = [&losses] (dy::Expression& scores, int tag) {
+            if (tag >= 0) {
+                auto ls = dy::pickneglogsoftmax(scores, (unsigned) tag);
+                losses.push_back(ls);
+            }
+        };
+
         for (auto i = 0u; i < batch.size(); ++i) {
             auto sent = batch[i];
             if (sent.size() == 1) {
-                auto loss = dy::pickneglogsoftmax(out[i], sent.tags[0]);
-                losses.push_back(loss);
+                if (sent.tags[0] >= 0)
+                    append_loss(out[i], sent.tags[0]);
             } else {
                 for (auto j = 0u; j < sent.size(); ++j) {
                     auto scores = dy::pick(out[i], j, 1);
-                    auto loss = dy::pickneglogsoftmax(scores, sent.tags[j]);
-                    losses.push_back(loss);
+                    append_loss(scores, sent.tags[j]);
                 }
             }
         }
@@ -225,4 +231,61 @@ struct GCNTagger : public BaseEmbedModel
     unsigned hidden_dim_;
     int n_classes_;
     float dropout_;
+};
+
+struct ListopsTagger : public GCNTagger
+{
+    using GCNTagger::GCNTagger;
+
+    const unsigned int DEL_IX = 1;
+
+    virtual
+    vector<Expression>
+    predict_batch(
+        ComputationGraph& cg,
+        const TaggedBatch& batch)
+    override
+    {
+        gcn.new_graph(cg, training_);
+        tree->new_graph(cg, training_);
+
+        auto out_b = parameter(cg, p_out_b);
+        auto out_W = parameter(cg, p_out_W);
+
+        vector<Expression> out;
+
+        for (auto && sample : batch)
+        {
+            auto ctx = embed_sent(cg, sample.sentence);
+
+            // dropout embeddings
+            if (training_)
+            {
+                for (auto&& h : ctx)
+                    h = dy::dropout(h, dropout_);
+            }
+
+            // get adj tree from true embeddings (root already included)
+            auto G = tree->make_adj(ctx, sample.sentence);
+
+            // make delexicalized input
+
+            auto delex_sentence = sample.sentence;
+            delex_sentence.word_ixs = \
+                std::vector<unsigned int>(delex_sentence.size(), DEL_IX);
+            auto delex = embed_sent(cg, delex_sentence);
+
+            auto X = dy::concatenate_cols(delex);
+            auto H = gcn.apply(X, G);
+
+            // dropout h
+            if (training_)
+                H = dy::dropout(H, dropout_);
+
+            H = dy::affine_transform({out_b, out_W, H});
+            out.push_back(H);
+        }
+
+        return out;
+    }
 };

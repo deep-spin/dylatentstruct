@@ -26,7 +26,8 @@ class ConfusionMatrix
     {};
 
     void insert(int y_true, int y_pred) {
-        counts.at(y_true).at(y_pred) += 1;
+        if (y_true >= 0) // negative indices mean mask
+            counts.at(y_true).at(y_pred) += 1;
     }
 
     double accuracy() {

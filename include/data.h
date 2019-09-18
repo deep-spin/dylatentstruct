@@ -24,7 +24,7 @@ struct LabeledSentence
 struct TaggedSentence
 {
     Sentence sentence;
-    std::vector<unsigned> tags;
+    std::vector<int> tags;
 
     size_t size() const { return sentence.size(); }
 };

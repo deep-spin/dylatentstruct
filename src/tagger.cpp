@@ -118,6 +118,7 @@ train(
                 auto lossval = dy::as_scalar(cg.incremental_forward(loss));
                 total_loss += batch->size() * lossval;
                 cg.backward(loss);
+                clf->save("test.dy");
                 trainer.update();
             }
         }
@@ -152,7 +153,7 @@ train(
                   << std::endl;
 
 
-        if ((valid_f1 + 0.0001) > last_valid_f1)
+        if (valid_f1 > last_valid_f1)
         {
             impatience = 0;
         }
@@ -218,8 +219,8 @@ int main(int argc, char** argv)
 
     dy::initialize(dyparams);
 
-    unsigned EMBED_DIM = 300;
-    unsigned HIDDEN_DIM = 300;
+    unsigned EMBED_DIM = clf_opts.dataset == "listops" ? 50 : 300;
+    unsigned HIDDEN_DIM = clf_opts.dataset == "listops" ? 50 : 300;
 
     std::stringstream vocab_fn, train_fn, valid_fn, test_fn, embed_fn, class_fn;
 
@@ -237,18 +238,32 @@ int main(int argc, char** argv)
     cout << "number of classes: " << n_classes << endl;
 
     dy::ParameterCollection params;
-    auto clf = std::make_unique<GCNTagger>(
-        params,
-        vocab_size,
-        EMBED_DIM,
-        HIDDEN_DIM,
-        n_classes,
-        opts.dropout,
-        gcn_opts,
-        smap_opts.sm_opts);
+
+    std::unique_ptr<GCNTagger> clf;
+
+    if (clf_opts.dataset == "listops")
+        clf = std::make_unique<ListopsTagger>(
+            params,
+            vocab_size,
+            EMBED_DIM,
+            HIDDEN_DIM,
+            n_classes,
+            opts.dropout,
+            gcn_opts,
+            smap_opts.sm_opts);
+    else
+        clf = std::make_unique<GCNTagger>(
+            params,
+            vocab_size,
+            EMBED_DIM,
+            HIDDEN_DIM,
+            n_classes,
+            opts.dropout,
+            gcn_opts,
+            smap_opts.sm_opts);
 
     //clf->load_embeddings(embed_fn.str());
-    //
+
     if (opts.test) {
         test(clf, opts, valid_fn.str(), test_fn.str());
         return 0;

@@ -82,10 +82,10 @@ target_include_directories(
 )
 
 target_compile_options(dylatentstruct PUBLIC
-#    -Ofast
+    -Ofast
 #     -Werror
-    -O0
-    -g
+#    -O0
+#    -g
     -Wall
     -Wextra
     -pedantic
