@@ -17,6 +17,7 @@ struct TrainOpts : BaseOpts
     unsigned max_iter = 20;
     unsigned batch_size = 16;
     unsigned patience = 5;
+    unsigned dim = 300;
     float lr = 1;
     float decay = 0.9;
     float dropout = 0.1;
@@ -46,6 +47,12 @@ struct TrainOpts : BaseOpts
                 std::string val = argv[i + 1];
                 std::istringstream vals(val);
                 vals >> lr;
+                i += 2;
+            } else if (arg == "--dim") {
+                assert(i + 1 < argc);
+                std::string val = argv[i + 1];
+                std::istringstream vals(val);
+                vals >> dim;
                 i += 2;
             } else if (arg == "--decay") {
                 assert(i + 1 < argc);
@@ -112,6 +119,7 @@ struct TrainOpts : BaseOpts
           << " Save prefix: " << save_prefix << '\n'
           << "   Max. iter: " << max_iter << '\n'
           << "  Batch size: " << batch_size << '\n'
+          << "   Dimension: " << dim << '\n'
           << "          LR: " << lr << '\n'
           << "       Decay: " << decay << '\n'
           << "     Dropout: " << dropout << '\n'
@@ -126,7 +134,12 @@ struct TrainOpts : BaseOpts
     virtual std::string get_filename() const override
     {
         std::ostringstream fn;
-        fn << "bs_" << batch_size << "_lr_" << lr << "_decay_" << decay << "_";
+        fn << "bs_" << batch_size
+           << "_dim_" << dim
+           << "_drop_" << dropout
+           << "_lr_" << lr
+           << "_decay_" << decay
+           << "_";
         return fn.str();
     }
 };
@@ -273,98 +286,6 @@ struct ClfOpts : BaseOpts
     {
         std::ostringstream fn;
         fn << dataset;
-        return fn.str();
-    }
-};
-
-struct ListOpOpts : public BaseOpts
-{
-    size_t hidden_dim = 100;
-    float dropout = 0.1;
-    std::string tree_str = "gold";
-    size_t self_iter = 5;
-
-    enum class Tree
-    {
-        FLAT,
-        LTR,
-        GOLD,
-        MST,
-        MST_LSTM,
-        MST_CONSTR
-    };
-
-    Tree get_tree() const
-    {
-        if (tree_str == "flat")
-            return Tree::FLAT;
-        else if (tree_str == "ltr")
-            return Tree::LTR;
-        else if (tree_str == "gold")
-            return Tree::GOLD;
-        else if (tree_str == "mst")
-            return Tree::MST;
-        else if (tree_str == "mst-lstm")
-            return Tree::MST_LSTM;
-        else if (tree_str == "mst-constr")
-            return Tree::MST_CONSTR;
-        else {
-            std::cerr << "Invalid tree type." << std::endl;
-            std::exit(EXIT_FAILURE);
-        }
-    }
-
-    virtual void parse(int argc, char** argv)
-    {
-        int i = 1;
-        while (i < argc) {
-            std::string arg = argv[i];
-            if (arg == "--hidden-dim") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> hidden_dim;
-                i += 2;
-            } else if (arg == "--self-iter") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> self_iter;
-                i += 2;
-            } else if (arg == "--drop") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> dropout;
-                i += 2;
-            } else if (arg == "--tree") {
-                assert(i + 1 < argc);
-                tree_str = argv[i + 1];
-                i += 2;
-            } else {
-                i += 1;
-            }
-        }
-    }
-
-    virtual std::ostream& print(std::ostream& o) const
-    {
-        o << "ListOps task\n"
-          << " hidden dim: " << hidden_dim << '\n'
-          << "       tree: " << tree_str << '\n'
-          << "   selfiter: " << self_iter << '\n'
-          << "    dropout: " << dropout << '\n';
-        return o;
-    }
-
-    virtual std::string get_filename() const
-    {
-        std::ostringstream fn;
-        fn << "_dim" << hidden_dim
-           << "_drop" << dropout
-           << "_tree_" << tree_str
-           << "_selfit" << self_iter
-           << "_";
         return fn.str();
     }
 };

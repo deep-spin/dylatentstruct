@@ -118,7 +118,6 @@ train(
                 auto lossval = dy::as_scalar(cg.incremental_forward(loss));
                 total_loss += batch->size() * lossval;
                 cg.backward(loss);
-                clf->save("test.dy");
                 trainer.update();
             }
         }
@@ -219,9 +218,6 @@ int main(int argc, char** argv)
 
     dy::initialize(dyparams);
 
-    unsigned EMBED_DIM = clf_opts.dataset == "listops" ? 50 : 300;
-    unsigned HIDDEN_DIM = clf_opts.dataset == "listops" ? 50 : 300;
-
     std::stringstream vocab_fn, train_fn, valid_fn, test_fn, embed_fn, class_fn;
 
     train_fn << "data/tag/" << clf_opts.dataset << ".train";
@@ -245,8 +241,8 @@ int main(int argc, char** argv)
         clf = std::make_unique<ListopsTagger>(
             params,
             vocab_size,
-            EMBED_DIM,
-            HIDDEN_DIM,
+            opts.dim,
+            opts.dim,
             n_classes,
             opts.dropout,
             gcn_opts,
@@ -255,8 +251,8 @@ int main(int argc, char** argv)
         clf = std::make_unique<GCNTagger>(
             params,
             vocab_size,
-            EMBED_DIM,
-            HIDDEN_DIM,
+            opts.dim,
+            opts.dim,
             n_classes,
             opts.dropout,
             gcn_opts,
