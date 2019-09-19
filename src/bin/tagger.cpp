@@ -280,6 +280,7 @@ int main(int argc, char** argv)
     mlflow.log_parameter("saved_model", opts.saved_model);
     mlflow.log_parameter("batch_size",  std::to_string(opts.batch_size));
     mlflow.log_parameter("dropout",     std::to_string(opts.dropout));
+    mlflow.log_parameter("dim",         std::to_string(opts.dim));
 
     mlflow.log_parameter("strategy",    gcn_opts.tree_str);
     mlflow.log_parameter("gcn_layers",  std::to_string(gcn_opts.layers));
