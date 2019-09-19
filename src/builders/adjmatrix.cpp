@@ -64,9 +64,12 @@ LtrAdjacency::make_adj(const std::vector<dy::Expression>&, const Sentence& sent)
 {
     size_t n = sent.heads.size() - 1;
     std::vector<unsigned> nonneg_heads;
-    for (size_t k = 1; k < n; ++k)
+
+    size_t k = 1;
+    for (; k < n; ++k)
         nonneg_heads.push_back(k + 1);
-    nonneg_heads.push_back(0);
+    if (k <= n)
+        nonneg_heads.push_back(0);
     return make_fixed_adj(nonneg_heads);
 }
 
