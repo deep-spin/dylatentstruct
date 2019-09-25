@@ -127,6 +127,10 @@ add_grandpa_pairs(AD3::FactorGraph* fg,
 // Constructors
 // ************
 
+MatchingBuilder::MatchingBuilder(const dy::SparseMAPOpts& opts)
+  : opts(opts)
+{}
+
 HeadPreservingBuilder::HeadPreservingBuilder(dy::ParameterCollection& params,
                                              const dy::SparseMAPOpts& opts)
   : p(params.add_subcollection("headattn"))
@@ -185,6 +189,10 @@ HeadHOMatchingBuilder::HeadHOMatchingBuilder(dy::ParameterCollection& params,
 // ***
 
 void
+MatchingBuilder::new_graph(dy::ComputationGraph&, bool)
+{}
+
+void
 HeadPreservingBuilder::new_graph(dy::ComputationGraph& cg, bool)
 {
     e_affinity = dy::parameter(cg, p_affinity);
@@ -210,6 +218,42 @@ HeadHOMatchingBuilder::new_graph(dy::ComputationGraph& cg, bool)
     e_affinity = dy::parameter(cg, p_affinity);
     e_cross = dy::parameter(cg, p_cross);
     e_grandpa = dy::parameter(cg, p_grandpa);
+}
+
+
+dynet::Expression
+MatchingBuilder::attend(const dynet::Expression scores,
+                        const std::vector<int>&,
+                        const std::vector<int>&)
+{
+    auto d = scores.dim();
+    unsigned prem_sz = d[0], hypo_sz = d[1];
+
+    auto fg = std::make_unique<AD3::FactorGraph>();
+
+    std::vector<AD3::BinaryVariable*> vars;
+    for (size_t j = 0; j < hypo_sz; ++j) {
+        for (size_t i = 0; i < prem_sz; ++i) {
+            auto var = fg->CreateBinaryVariable();
+            vars.push_back(var);
+        }
+    }
+
+    // MatchingFactor over all of them
+    auto* matching = new sparsemap::FactorMatching;
+    fg->DeclareFactor(matching, vars, /*owned_by_graph=*/true);
+    matching->Initialize(hypo_sz, prem_sz);
+
+    auto eta_u = dy::reshape(scores, { prem_sz * hypo_sz });
+    auto u = dy::sparsemap(eta_u, std::move(fg), opts);
+
+    u = dy::reshape(u, d);
+
+    //std::cout << u.value() << std::endl;
+    //std::cout << dy::sum_dim(u, {0u}).value() << std::endl;
+    //std::cout << dy::sum_dim(u, {1u}).value() << std::endl;
+    //std::abort();
+    return u;
 }
 
 dynet::Expression

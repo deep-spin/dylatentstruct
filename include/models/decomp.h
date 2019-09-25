@@ -53,6 +53,8 @@ struct Decomp : public BaseNLI
             attn = std::make_unique<BiSoftmaxBuilder>();
         else if (attn_type == AttnOpts::Attn::SPARSEMAX)
             attn = std::make_unique<BiSparsemaxBuilder>();
+        else if (attn_type == AttnOpts::Attn::MATCH)
+            attn = std::make_unique<MatchingBuilder>(smap_opts);
         else if (attn_type == AttnOpts::Attn::HEAD)
             attn = std::make_unique<HeadPreservingBuilder>(p, smap_opts);
         else if (attn_type == AttnOpts::Attn::HEADMATCH)

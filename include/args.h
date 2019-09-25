@@ -297,6 +297,7 @@ struct AttnOpts : public BaseOpts
     {
         SOFTMAX,
         SPARSEMAX,
+        MATCH,
         HEAD,
         HEADMATCH,
         HEADHO,
@@ -306,7 +307,8 @@ struct AttnOpts : public BaseOpts
     bool is_sparsemap()
     {
         auto attn = get_attn();
-        return (attn == Attn::HEAD ||
+        return (attn == Attn::MATCH ||
+                attn == Attn::HEAD ||
                 attn == Attn::HEADMATCH ||
                 attn == Attn::HEADHO ||
                 attn == Attn::HEADMATCHHO);
@@ -333,6 +335,8 @@ struct AttnOpts : public BaseOpts
             return Attn::SOFTMAX;
         else if (attn_str == "sparsemax")
             return Attn::SPARSEMAX;
+        else if (attn_str == "match")
+            return Attn::MATCH;
         else if (attn_str == "head")
             return Attn::HEAD;
         else if (attn_str == "headmatch")

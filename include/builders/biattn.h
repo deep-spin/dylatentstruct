@@ -56,6 +56,19 @@ struct IndepBiAttnBuilder : BiAttentionBuilder
       const NLIPair& sample);
 };
 
+struct MatchingBuilder : SymmBiAttnBuilder
+{
+    dynet::SparseMAPOpts opts;
+
+    explicit MatchingBuilder(const dynet::SparseMAPOpts& opts);
+
+    virtual void new_graph(dynet::ComputationGraph& cg, bool training);
+
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads);
+};
+
 struct HeadPreservingBuilder : IndepBiAttnBuilder
 {
 
