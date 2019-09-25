@@ -31,7 +31,6 @@ struct BaseModel
         training_ = false;
     }
 
-
     void save(const std::string filename)
     {
         dy::TextFileSaver s(filename);

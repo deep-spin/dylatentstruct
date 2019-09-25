@@ -369,10 +369,8 @@ struct DecompOpts : public BaseOpts
 {
 
     std::string dataset;
-    int lstm_layers = 0;
     bool update_embed = false;
     bool normalize_embed = false;
-    float dropout = .0f;
 
     virtual void parse(int argc, char** argv)
     {
@@ -383,24 +381,12 @@ struct DecompOpts : public BaseOpts
                 assert(i + 1 < argc);
                 dataset = argv[i + 1];
                 i += 2;
-            } else if (arg == "--drop") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> dropout;
-                i += 2;
             } else if (arg == "--update-embed") {
                 update_embed = true;
                 i += 1;
             } else if (arg == "--normalize-embed") {
                 normalize_embed = true;
                 i += 1;
-            } else if (arg == "--lstm-layers") {
-                assert(i + 1 < argc);
-                std::string val = argv[i + 1];
-                std::istringstream vals(val);
-                vals >> lstm_layers;
-                i += 2;
             } else {
                 i += 1;
             }
@@ -411,8 +397,6 @@ struct DecompOpts : public BaseOpts
     {
         std::ostringstream fn;
         fn << "_Decomp_" << dataset
-           << "_drop_" << dropout
-           << "_lstm_" << lstm_layers
            << "_update_" << update_embed
            << "_nrm_" << normalize_embed;
         return fn.str();
@@ -422,8 +406,6 @@ struct DecompOpts : public BaseOpts
     {
         o << " Decomp settings\n"
           << "     Dataset: " << dataset << '\n'
-          << "     Dropout: " << dropout << '\n'
-          << "     LSTM layers: " << lstm_layers << '\n'
           << "     Update emb: " << update_embed << '\n'
           << "     Normlz emb: " << normalize_embed << '\n';
         return o;

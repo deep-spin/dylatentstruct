@@ -1,5 +1,5 @@
-#pragma once
 
+#pragma once
 /* Author: Caio Corro
  * License: MIT
  * Part of https://github.com/FilippoC/dynet-tools/

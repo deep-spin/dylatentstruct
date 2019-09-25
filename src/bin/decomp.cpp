@@ -28,15 +28,10 @@ main(int argc, char** argv)
     AttnOpts attn_opts;
     attn_opts.parse(argc, argv);
 
-    GCNOpts gcn_opts;
-    gcn_opts.parse(argc, argv);
-
     SparseMAPOpts smap_opts;
     smap_opts.parse(argc, argv);
 
-    bool is_gcn = gcn_opts.layers > 0;
-    bool is_sparsemap =
-      (attn_opts.is_sparsemap() || gcn_opts.get_tree() == GCNOpts::Tree::MST);
+    bool is_sparsemap = attn_opts.is_sparsemap();
 
     if (opts.override_dy) {
         dyparams.random_seed = 42;
@@ -50,9 +45,6 @@ main(int argc, char** argv)
 
     if (is_sparsemap)
         std::cout << smap_opts << std::endl;
-
-    if (is_gcn)
-        std::cout << gcn_opts << std::endl;
 
     std::stringstream vocab_fn, train_fn, valid_fn, test_fn, embed_fn, class_fn;
     vocab_fn << "data/nli/" << decomp_opts.dataset << ".vocab";
@@ -77,17 +69,11 @@ main(int argc, char** argv)
       std::make_unique<Decomp>(params,
                                vocab_size,
                                EMBED_DIM,
-                               /* hidden_dim = */ 300,
+                               opts.dim,
                                n_classes,
-                               gcn_opts.layers,
-                               gcn_opts.iter,
-                               gcn_opts.use_distance,
-                               gcn_opts.get_tree(),
                                attn_opts.get_attn(),
                                smap_opts.sm_opts,
-                               decomp_opts.dropout,
-                               gcn_opts.budget,
-                               decomp_opts.lstm_layers,
+                               opts.dropout,
                                decomp_opts.update_embed);
 
     clf->load_embeddings(embed_fn.str(), decomp_opts.normalize_embed);
@@ -98,6 +84,9 @@ main(int argc, char** argv)
 
     mlflow.log_parameter("dataset", decomp_opts.dataset);
 
+    mlflow.log_parameter("update_embed", decomp_opts.update_embed ? "true" : "false");
+    mlflow.log_parameter("normalize_embed", decomp_opts.normalize_embed ? "true" : "false");
+
     mlflow.log_parameter("mode", opts.test ? "test" : "train");
     mlflow.log_parameter("lr", std::to_string(opts.lr));
     mlflow.log_parameter("decay", std::to_string(opts.decay));
@@ -106,17 +95,10 @@ main(int argc, char** argv)
     mlflow.log_parameter("saved_model", opts.saved_model);
     mlflow.log_parameter("batch_size", std::to_string(opts.batch_size));
 
-    mlflow.log_parameter("dropout", std::to_string(decomp_opts.dropout));
+    mlflow.log_parameter("dropout", std::to_string(opts.dropout));
     mlflow.log_parameter("fn_prefix", opts.save_prefix);
 
-    if (is_gcn) {
-        mlflow.log_parameter("GCN_layers", std::to_string(gcn_opts.layers));
-        mlflow.log_parameter("GCN_iter", std::to_string(gcn_opts.iter));
-        mlflow.log_parameter("GCN_tree_type", gcn_opts.tree_str);
-        mlflow.log_parameter("GCN_BUDGET", std::to_string(gcn_opts.budget));
-        mlflow.log_parameter("GCN_dropout", std::to_string(gcn_opts.dropout));
-        mlflow.log_parameter("GCN_use_distance", gcn_opts.use_distance ? "true" : "false");
-    }
+    mlflow.log_parameter("attention", attn_opts.attn_str);
 
     if (is_sparsemap) {
         mlflow.log_parameter("SM_maxit",
@@ -141,9 +123,6 @@ main(int argc, char** argv)
 
     if (is_sparsemap)
         fn << smap_opts.get_filename();
-
-    if (is_gcn)
-        fn << gcn_opts.get_filename();
 
     if (opts.test)
         test(clf, opts, valid_fn.str(), test_fn.str());
