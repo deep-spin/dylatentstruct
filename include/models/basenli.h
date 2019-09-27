@@ -143,6 +143,7 @@ train(std::unique_ptr<BaseNLI>& clf,
 
             for (auto&& batch : train_iter) {
                 dy::ComputationGraph cg;
+                //cg.set_immediate_compute(true);
                 auto loss = clf->batch_loss(cg, *batch);
                 auto loss_val = dy::as_scalar(cg.incremental_forward(loss));
                 total_loss += batch->size() * loss_val;

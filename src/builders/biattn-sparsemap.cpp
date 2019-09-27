@@ -303,17 +303,22 @@ XORMatchingBuilder::attend(const dynet::Expression scores,
             vars_col.at(i) = var;
             vars_rows.at(i).push_back(var);
         }
-        if (prem_sz < hypo_sz)
-            fg->CreateFactorAtMostOne(vars_col);
-        else
-            fg->CreateFactorXOR(vars_col);
+
+        if (prem_sz > 1) {
+            if (prem_sz < hypo_sz)
+                fg->CreateFactorAtMostOne(vars_col);
+            else
+                fg->CreateFactorXOR(vars_col);
+        }
     }
 
-    for (size_t i = 0; i < prem_sz; ++i) {
-        if (hypo_sz < prem_sz)
-            fg->CreateFactorAtMostOne(vars_rows.at(i));
-        else
-            fg->CreateFactorXOR(vars_rows.at(i));
+    if (hypo_sz > 1) {
+        for (size_t i = 0; i < prem_sz; ++i) {
+            if (hypo_sz < prem_sz)
+                fg->CreateFactorAtMostOne(vars_rows.at(i));
+            else
+                fg->CreateFactorXOR(vars_rows.at(i));
+        }
     }
 
     auto eta_u = dy::reshape(scores, { prem_sz * hypo_sz });
@@ -325,16 +330,27 @@ XORMatchingBuilder::attend(const dynet::Expression scores,
 }
 
 dynet::Expression
-NeighborMatchingBuilder::attend(const dynet::Expression scores,
-                                const std::vector<int>& ph,
-                                const std::vector<int>& hh)
+NeighborMatchingBuilder::attend(const dynet::Expression scores_,
+                                const std::vector<int>&,
+                                const std::vector<int>&)
 {
+    dynet::Expression scores = scores_;
     auto d = scores.dim();
     unsigned prem_sz = d[0], hypo_sz = d[1];
 
-    if (prem_sz < hypo_sz) {
-        auto out_t = attend(dy::transpose(scores), ph, hh);
-        return dy::transpose(out_t);
+
+    bool transposed = false;
+
+    //if (prem_sz < hypo_sz) {
+    if (0) {
+        std::cout << "FLIP" << std::endl;
+        scores = dy::transpose(scores);
+        d = scores.dim();
+        prem_sz = d[0];
+        hypo_sz = d[1];
+        transposed = true;
+        //auto out_t = attend(dy::transpose(scores), ph, hh);
+        //return dy::transpose(out_t);
     }
 
     auto fg = std::make_unique<AD3::FactorGraph>();
@@ -353,8 +369,13 @@ NeighborMatchingBuilder::attend(const dynet::Expression scores,
     fg->DeclareFactor(seq, vars, /*owned_by_graph=*/true);
     seq->Initialize(hypo_sz, prem_sz);
 
-    for (size_t i = 0; i < prem_sz; ++i) {
-        fg->CreateFactorAtMostOne(vars_rows.at(i));
+    if (hypo_sz > 1) {
+        for (size_t i = 0; i < prem_sz; ++i) {
+            if (prem_sz <= hypo_sz)
+                fg->CreateFactorXOR(vars_rows.at(i));
+            else
+                fg->CreateFactorAtMostOne(vars_rows.at(i));
+        }
     }
 
     auto* cpu = dy::get_device_manager()->get_global_device("CPU");
@@ -362,10 +383,15 @@ NeighborMatchingBuilder::attend(const dynet::Expression scores,
 
     auto eta_u = dy::reshape(scores, { prem_sz * hypo_sz });
     auto eta_v = dy::reshape(hot, {2, 1}) * e_affinity;
+    //auto eta_v = hot;
 
     auto u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
 
     u = dy::reshape(u, d);
+    //std::cout << u.value() << std::endl;
+
+    if (transposed)
+        return dy::transpose(u);
 
     return u;
 }
