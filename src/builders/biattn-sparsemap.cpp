@@ -1,5 +1,7 @@
 #include "builders/biattn.h"
 #include "factors/FactorMatching.h"
+#include "factors/FactorSequenceDistance.h"
+
 #include <dynet/devices.h>
 #include <dynet/param-init.h>
 #include <sparsemap.h>
@@ -8,7 +10,6 @@ namespace dy = dynet;
 
 //
 // Utility functions
-//
 
 // cannot use dy::ones since it is on gpu
 dy::Expression
@@ -87,7 +88,7 @@ add_grandpa_pairs(AD3::FactorGraph* fg,
                   const std::vector<int>& prem_heads,
                   const std::vector<int>& hypo_heads)
 {
-    //std::cout << prem_sz << " " << hypo_sz << std::endl;
+    // std::cout << prem_sz << " " << hypo_sz << std::endl;
     unsigned n_pairs = 0;
     for (size_t j = 0; j < hypo_sz; ++j) {
         for (size_t i = 0; i < prem_sz; ++i) {
@@ -98,8 +99,8 @@ add_grandpa_pairs(AD3::FactorGraph* fg,
             int hj = hypo_heads.at(1 + j) - 1;
             int gj = hypo_heads.at(1 + hj) - 1;
 
-            //std::cout << hi <<' '<< hj <<' ' << gj << std::endl;
-            //std::cout << hi << ' ' << gi <<' '<< gj << std::endl;
+            // std::cout << hi <<' '<< hj <<' ' << gj << std::endl;
+            // std::cout << hi << ' ' << gi <<' '<< gj << std::endl;
 
             if (hi >= 0 && hj >= 0 && gj >= 0) {
                 auto ij = prem_sz * j + i;
@@ -129,6 +130,22 @@ add_grandpa_pairs(AD3::FactorGraph* fg,
 
 MatchingBuilder::MatchingBuilder(const dy::SparseMAPOpts& opts)
   : opts(opts)
+{}
+
+XORMatchingBuilder::XORMatchingBuilder(const dy::SparseMAPOpts& opts)
+  : opts(opts)
+{}
+
+NeighborMatchingBuilder::NeighborMatchingBuilder(
+  dy::ParameterCollection& params,
+  const dy::SparseMAPOpts& opts)
+  : p(params.add_subcollection("neighborattn"))
+  , p_affinity(
+      p.add_parameters({ 1 },
+                       dy::ParameterInitConst(1.0f),
+                       "affinity",
+                       dy::get_device_manager()->get_global_device("CPU")))
+  , opts(opts)
 {}
 
 HeadPreservingBuilder::HeadPreservingBuilder(dy::ParameterCollection& params,
@@ -193,6 +210,16 @@ MatchingBuilder::new_graph(dy::ComputationGraph&, bool)
 {}
 
 void
+XORMatchingBuilder::new_graph(dy::ComputationGraph&, bool)
+{}
+
+void
+NeighborMatchingBuilder::new_graph(dy::ComputationGraph& cg, bool)
+{
+    e_affinity = dy::parameter(cg, p_affinity);
+}
+
+void
 HeadPreservingBuilder::new_graph(dy::ComputationGraph& cg, bool)
 {
     e_affinity = dy::parameter(cg, p_affinity);
@@ -219,7 +246,6 @@ HeadHOMatchingBuilder::new_graph(dy::ComputationGraph& cg, bool)
     e_cross = dy::parameter(cg, p_cross);
     e_grandpa = dy::parameter(cg, p_grandpa);
 }
-
 
 dynet::Expression
 MatchingBuilder::attend(const dynet::Expression scores,
@@ -249,10 +275,98 @@ MatchingBuilder::attend(const dynet::Expression scores,
 
     u = dy::reshape(u, d);
 
-    //std::cout << u.value() << std::endl;
-    //std::cout << dy::sum_dim(u, {0u}).value() << std::endl;
-    //std::cout << dy::sum_dim(u, {1u}).value() << std::endl;
-    //std::abort();
+    // std::cout << u.value() << std::endl;
+    // std::cout << dy::sum_dim(u, {0u}).value() << std::endl;
+    // std::cout << dy::sum_dim(u, {1u}).value() << std::endl;
+    // std::abort();
+    return u;
+}
+
+dynet::Expression
+XORMatchingBuilder::attend(const dynet::Expression scores,
+                           const std::vector<int>&,
+                           const std::vector<int>&)
+{
+    auto d = scores.dim();
+    unsigned prem_sz = d[0], hypo_sz = d[1];
+
+    auto fg = std::make_unique<AD3::FactorGraph>();
+
+    std::vector<AD3::BinaryVariable*> vars;
+    std::vector<std::vector<AD3::BinaryVariable*>> vars_rows(prem_sz);
+    std::vector<AD3::BinaryVariable*> vars_col(prem_sz);
+
+    for (size_t j = 0; j < hypo_sz; ++j) {
+        for (size_t i = 0; i < prem_sz; ++i) {
+            auto var = fg->CreateBinaryVariable();
+            vars.push_back(var);
+            vars_col.at(i) = var;
+            vars_rows.at(i).push_back(var);
+        }
+        if (prem_sz < hypo_sz)
+            fg->CreateFactorAtMostOne(vars_col);
+        else
+            fg->CreateFactorXOR(vars_col);
+    }
+
+    for (size_t i = 0; i < prem_sz; ++i) {
+        if (hypo_sz < prem_sz)
+            fg->CreateFactorAtMostOne(vars_rows.at(i));
+        else
+            fg->CreateFactorXOR(vars_rows.at(i));
+    }
+
+    auto eta_u = dy::reshape(scores, { prem_sz * hypo_sz });
+    auto u = dy::sparsemap(eta_u, std::move(fg), opts);
+
+    u = dy::reshape(u, d);
+
+    return u;
+}
+
+dynet::Expression
+NeighborMatchingBuilder::attend(const dynet::Expression scores,
+                                const std::vector<int>& ph,
+                                const std::vector<int>& hh)
+{
+    auto d = scores.dim();
+    unsigned prem_sz = d[0], hypo_sz = d[1];
+
+    if (prem_sz < hypo_sz) {
+        auto out_t = attend(dy::transpose(scores), ph, hh);
+        return dy::transpose(out_t);
+    }
+
+    auto fg = std::make_unique<AD3::FactorGraph>();
+    std::vector<AD3::BinaryVariable*> vars;
+    std::vector<std::vector<AD3::BinaryVariable*>> vars_rows(prem_sz);
+
+    for (size_t j = 0; j < hypo_sz; ++j) {
+        for (size_t i = 0; i < prem_sz; ++i) {
+            auto var = fg->CreateBinaryVariable();
+            vars.push_back(var);
+            vars_rows.at(i).push_back(var);
+        }
+    }
+
+    auto* seq = new sparsemap::FactorSequenceAdjacent;
+    fg->DeclareFactor(seq, vars, /*owned_by_graph=*/true);
+    seq->Initialize(hypo_sz, prem_sz);
+
+    for (size_t i = 0; i < prem_sz; ++i) {
+        fg->CreateFactorAtMostOne(vars_rows.at(i));
+    }
+
+    auto* cpu = dy::get_device_manager()->get_global_device("CPU");
+    auto hot = dy::one_hot(*scores.pg, 2u, 0u, cpu);
+
+    auto eta_u = dy::reshape(scores, { prem_sz * hypo_sz });
+    auto eta_v = dy::reshape(hot, {2, 1}) * e_affinity;
+
+    auto u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
+
+    u = dy::reshape(u, d);
+
     return u;
 }
 
@@ -276,6 +390,7 @@ HeadPreservingBuilder::attend(const dynet::Expression scores,
             vars.push_back(var);
             vars_col.at(i) = var;
         }
+
         fg->CreateFactorXOR(vars_col);
     }
 
@@ -364,10 +479,10 @@ HeadHOBuilder::attend(const dynet::Expression scores,
     unsigned n_gp =
       add_grandpa_pairs(fg.get(), prem_sz, hypo_sz, prem_heads, hypo_heads);
 
-    //std::cerr << n_hd << " " << n_cr << " " << n_gp << std::endl;
+    // std::cerr << n_hd << " " << n_cr << " " << n_gp << std::endl;
 
-    //fg->Print(std::cout);
-    //fg->SetVerbosity(2);
+    // fg->Print(std::cout);
+    // fg->SetVerbosity(2);
 
     auto eta_u = dy::reshape(scores, { prem_sz * hypo_sz });
 
@@ -390,14 +505,13 @@ HeadHOBuilder::attend(const dynet::Expression scores,
     if (v_expr.size() > 0) {
         auto eta_v = dy::concatenate(v_expr);
         u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
-    }
-    else
+    } else
         u = dy::sparsemap(eta_u, std::move(fg), opts);
 
     u = dy::reshape(u, d);
 
-    //std::cout << u.value() << std::endl;
-    //std::abort();
+    // std::cout << u.value() << std::endl;
+    // std::abort();
     return u;
 }
 
@@ -453,8 +567,7 @@ HeadHOMatchingBuilder::attend(const dynet::Expression scores,
     if (v_expr.size() > 0) {
         auto eta_v = dy::concatenate(v_expr);
         u = dy::sparsemap(eta_u, eta_v, std::move(fg), opts);
-    }
-    else
+    } else
         u = dy::sparsemap(eta_u, std::move(fg), opts);
 
     u = dy::reshape(u, d);

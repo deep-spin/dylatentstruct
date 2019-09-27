@@ -298,6 +298,8 @@ struct AttnOpts : public BaseOpts
         SOFTMAX,
         SPARSEMAX,
         MATCH,
+        XOR_MATCH,
+        NEIGHBOR_MATCH,
         HEAD,
         HEADMATCH,
         HEADHO,
@@ -308,6 +310,8 @@ struct AttnOpts : public BaseOpts
     {
         auto attn = get_attn();
         return (attn == Attn::MATCH ||
+                attn == Attn::XOR_MATCH ||
+                attn == Attn::NEIGHBOR_MATCH ||
                 attn == Attn::HEAD ||
                 attn == Attn::HEADMATCH ||
                 attn == Attn::HEADHO ||
@@ -337,6 +341,10 @@ struct AttnOpts : public BaseOpts
             return Attn::SPARSEMAX;
         else if (attn_str == "match")
             return Attn::MATCH;
+        else if (attn_str == "xor-match")
+            return Attn::XOR_MATCH;
+        else if (attn_str == "neighbor-match")
+            return Attn::NEIGHBOR_MATCH;
         else if (attn_str == "head")
             return Attn::HEAD;
         else if (attn_str == "headmatch")

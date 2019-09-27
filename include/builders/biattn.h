@@ -69,6 +69,38 @@ struct MatchingBuilder : SymmBiAttnBuilder
                                      const std::vector<int>& hypo_heads);
 };
 
+struct XORMatchingBuilder : SymmBiAttnBuilder
+{
+    dynet::SparseMAPOpts opts;
+
+    explicit XORMatchingBuilder(const dynet::SparseMAPOpts& opts);
+
+    virtual void new_graph(dynet::ComputationGraph& cg, bool training);
+
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads);
+};
+
+struct NeighborMatchingBuilder : SymmBiAttnBuilder
+{
+
+    dynet::ParameterCollection p;
+
+    dynet::Parameter p_affinity;
+    dynet::Expression e_affinity;
+    dynet::SparseMAPOpts opts;
+
+    explicit NeighborMatchingBuilder(dynet::ParameterCollection& params,
+                                     const dynet::SparseMAPOpts& opts);
+
+    virtual void new_graph(dynet::ComputationGraph& cg, bool training);
+
+    virtual dynet::Expression attend(const dynet::Expression scores,
+                                     const std::vector<int>& prem_heads,
+                                     const std::vector<int>& hypo_heads);
+};
+
 struct HeadPreservingBuilder : IndepBiAttnBuilder
 {
 
