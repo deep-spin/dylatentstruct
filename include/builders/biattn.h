@@ -14,7 +14,7 @@ struct BiAttentionBuilder
 {
     virtual void new_graph(dynet::ComputationGraph& cg, bool training);
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
-      const dynet::Expression& scores,
+      const dynet::Expression scores,
       const NLIPair& sample) = 0;
 };
 
@@ -22,7 +22,7 @@ struct BiSoftmaxBuilder : BiAttentionBuilder
 {
 
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
-      const dynet::Expression& scores,
+      const dynet::Expression scores,
       const NLIPair& sample);
 };
 
@@ -30,7 +30,7 @@ struct BiSparsemaxBuilder : BiAttentionBuilder
 {
 
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
-      const dynet::Expression& scores,
+      const dynet::Expression scores,
       const NLIPair& sample);
 };
 
@@ -41,7 +41,7 @@ struct SymmBiAttnBuilder : BiAttentionBuilder
                                      const std::vector<int>& hypo_heads) = 0;
 
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
-      const dynet::Expression& scores,
+      const dynet::Expression scores,
       const NLIPair& sample);
 };
 
@@ -52,7 +52,7 @@ struct IndepBiAttnBuilder : BiAttentionBuilder
                                      const std::vector<int>& hypo_heads) = 0;
 
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
-      const dynet::Expression& scores,
+      const dynet::Expression scores,
       const NLIPair& sample);
 };
 
@@ -67,6 +67,7 @@ struct MatchingBuilder : SymmBiAttnBuilder
     virtual dynet::Expression attend(const dynet::Expression scores,
                                      const std::vector<int>& prem_heads,
                                      const std::vector<int>& hypo_heads);
+
 };
 
 struct XORMatchingBuilder : SymmBiAttnBuilder
@@ -77,9 +78,9 @@ struct XORMatchingBuilder : SymmBiAttnBuilder
 
     virtual void new_graph(dynet::ComputationGraph& cg, bool training);
 
-    virtual dynet::Expression attend(const dynet::Expression scores,
-                                     const std::vector<int>& prem_heads,
-                                     const std::vector<int>& hypo_heads);
+    dynet::Expression attend(const dynet::Expression scores,
+                             const std::vector<int>& prem_heads,
+                             const std::vector<int>& hypo_heads);
 };
 
 struct NeighborMatchingBuilder : SymmBiAttnBuilder

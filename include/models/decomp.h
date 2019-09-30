@@ -1,12 +1,12 @@
 #pragma once
 
 #include <vector>
+#include <dynet/index-tensor.h>
+#include <dynet/tensor.h>
 
 #include "args.h"
-#include "builders/adjmatrix.h"
 #include "builders/biattn.h"
-#include "builders/gatedgcn.h"
-#include "models/basenli.h"
+#include "models/basemodel.h"
 
 /*
  * Decomposable attention NLI classifiers
@@ -14,41 +14,98 @@
 
 namespace dy = dynet;
 
-struct Decomp : public BaseNLI
+struct DecompAttnParams
+{
+    DecompAttnParams(dy::ParameterCollection& pc,
+                     unsigned dim,
+                     unsigned embed_dim,
+                     unsigned n_classes)
+      : W_enc1{ pc.add_parameters({ dim, embed_dim }, 0, "W-enc-1") }
+      , b_enc1{ pc.add_parameters({ dim }, 0, "b-enc-1") }
+      , W_enc2{ pc.add_parameters({ dim, dim }, 0, "W-enc-2") }
+      , b_enc2{ pc.add_parameters({ dim }, 0, "b-enc-2") }
+      , W_comp1a{ pc.add_parameters({ dim, embed_dim }, 0, "W-comp-1a") }
+      , W_comp1b{ pc.add_parameters({ dim, embed_dim }, 0, "W-comp-1b") }
+      , b_comp1{ pc.add_parameters({ dim }, 0, "b-comp-1") }
+      , W_comp2{ pc.add_parameters({ dim, dim }, 0, "W-comp-2") }
+      , b_comp2{ pc.add_parameters({ dim }, 0, "b-comp-2") }
+      , W_agg1a{ pc.add_parameters({ dim, dim }, 0, "W-agg-1a") }
+      , W_agg1b{ pc.add_parameters({ dim, dim }, 0, "W-agg-1b") }
+      , b_agg1{ pc.add_parameters({ dim }, 0, "b-agg-1") }
+      , W_out{ pc.add_parameters({ n_classes, dim }, 0, "W-out") }
+      , b_out{ pc.add_parameters({ n_classes }, 0, "b-out") }
+    {}
+
+    dy::Parameter W_enc1;
+    dy::Parameter b_enc1;
+    dy::Parameter W_enc2;
+    dy::Parameter b_enc2;
+    dy::Parameter W_comp1a;
+    dy::Parameter W_comp1b;
+    dy::Parameter b_comp1;
+    dy::Parameter W_comp2;
+    dy::Parameter b_comp2;
+    dy::Parameter W_agg1a;
+    dy::Parameter W_agg1b;
+    dy::Parameter b_agg1;
+    dy::Parameter W_out;
+    dy::Parameter b_out;
+};
+
+struct DecompAttnExprs
+{
+    DecompAttnExprs() = default;
+    DecompAttnExprs(dy::ComputationGraph& cg, DecompAttnParams params)
+    {
+        W_enc1 = dy::parameter(cg, params.W_enc1);
+        b_enc1 = dy::parameter(cg, params.b_enc1);
+        W_enc2 = dy::parameter(cg, params.W_enc2);
+        b_enc2 = dy::parameter(cg, params.b_enc2);
+        W_comp1a = dy::parameter(cg, params.W_comp1a);
+        W_comp1b = dy::parameter(cg, params.W_comp1b);
+        b_comp1 = dy::parameter(cg, params.b_comp1);
+        W_comp2 = dy::parameter(cg, params.W_comp2);
+        b_comp2 = dy::parameter(cg, params.b_comp2);
+        W_agg1a = dy::parameter(cg, params.W_agg1a);
+        W_agg1b = dy::parameter(cg, params.W_agg1b);
+        b_agg1 = dy::parameter(cg, params.b_agg1);
+        W_out = dy::parameter(cg, params.W_out);
+        b_out = dy::parameter(cg, params.b_out);
+    }
+
+    dy::Expression W_enc1;
+    dy::Expression b_enc1;
+    dy::Expression W_enc2;
+    dy::Expression b_enc2;
+    dy::Expression W_comp1a;
+    dy::Expression W_comp1b;
+    dy::Expression b_comp1;
+    dy::Expression W_comp2;
+    dy::Expression b_comp2;
+    dy::Expression W_agg1a;
+    dy::Expression W_agg1b;
+    dy::Expression b_agg1;
+    dy::Expression W_out;
+    dy::Expression b_out;
+};
+
+struct DecompAttn : public BaseEmbedModel
 {
 
-    explicit Decomp(dy::ParameterCollection& params,
-                    unsigned vocab_size,
-                    unsigned embed_dim,
-                    unsigned hidden_dim,
-                    unsigned n_classes,
-                    AttnOpts::Attn attn_type,
-                    const dy::SparseMAPOpts& smap_opts,
-                    float dropout_p,
-                    bool update_embed)
-      : BaseNLI(params,
-                vocab_size,
-                embed_dim,
-                hidden_dim,
-                update_embed)
-      , p_out_b1{ p.add_parameters({ hidden_dim }) }
-      , p_out_W1a{ p.add_parameters({ hidden_dim, hidden_dim }) }
-      , p_out_W1b{ p.add_parameters({ hidden_dim, hidden_dim }) }
-      , p_out_b2{ p.add_parameters({ n_classes, hidden_dim }) }
-      , p_out_W2{ p.add_parameters({ n_classes, hidden_dim }) }
-      , p_enc_b1{ p.add_parameters({ hidden_dim }) }
-      , p_enc_W1{ p.add_parameters({ hidden_dim, embed_dim }) }
-      , p_enc_b2{ p.add_parameters({ hidden_dim }) }
-      , p_enc_W2{ p.add_parameters({ hidden_dim, hidden_dim }) }
-      , p_comp_b1{ p.add_parameters({ hidden_dim }) }
-      , p_comp_W1a{ p.add_parameters({ hidden_dim, embed_dim }) }
-      , p_comp_W1b{ p.add_parameters({ hidden_dim, embed_dim }) }
-      , p_comp_b2{ p.add_parameters({ hidden_dim }) }
-      , p_comp_W2{ p.add_parameters({ hidden_dim, hidden_dim }) }
-      //, p_sink{ p.add_parameters({ embed_dim }) }
+    explicit DecompAttn(dy::ParameterCollection& pc,
+                        unsigned vocab_size,
+                        unsigned embed_dim,
+                        unsigned hidden_dim,
+                        unsigned n_classes,
+                        AttnOpts::Attn attn_type,
+                        const dy::SparseMAPOpts& smap_opts,
+                        float dropout_p,
+                        bool update_embed)
+      : BaseEmbedModel(pc, vocab_size, embed_dim, update_embed)
+      , decomp_params(p, hidden_dim, embed_dim, n_classes)
       , dropout_p{ dropout_p }
+      , hidden_dim{ hidden_dim }
     {
-
         if (attn_type == AttnOpts::Attn::SOFTMAX)
             attn = std::make_unique<BiSoftmaxBuilder>();
         else if (attn_type == AttnOpts::Attn::SPARSEMAX)
@@ -59,15 +116,6 @@ struct Decomp : public BaseNLI
             attn = std::make_unique<XORMatchingBuilder>(smap_opts);
         else if (attn_type == AttnOpts::Attn::NEIGHBOR_MATCH)
             attn = std::make_unique<NeighborMatchingBuilder>(p, smap_opts);
-        else if (attn_type == AttnOpts::Attn::HEAD)
-            attn = std::make_unique<HeadPreservingBuilder>(p, smap_opts);
-        else if (attn_type == AttnOpts::Attn::HEADMATCH)
-            attn =
-              std::make_unique<HeadPreservingMatchingBuilder>(p, smap_opts);
-        else if (attn_type == AttnOpts::Attn::HEADHO)
-            attn = std::make_unique<HeadHOBuilder>(p, smap_opts);
-        else if (attn_type == AttnOpts::Attn::HEADMATCHHO)
-            attn = std::make_unique<HeadHOMatchingBuilder>(p, smap_opts);
         else {
             std::cerr << "Unimplemented attention mechanism." << std::endl;
             std::exit(EXIT_FAILURE);
@@ -77,28 +125,7 @@ struct Decomp : public BaseNLI
     void new_graph(dy::ComputationGraph& cg)
     {
         attn->new_graph(cg, training_);
-
-        e_out_b1 = dy::parameter(cg, p_out_b1);
-        e_out_W1a = dy::parameter(cg, p_out_W1a);
-        e_out_W1b = dy::parameter(cg, p_out_W1b);
-
-        e_out_b2 = dy::parameter(cg, p_out_b2);
-        e_out_W2 = dy::parameter(cg, p_out_W2);
-
-        e_enc_b1 = dy::parameter(cg, p_enc_b1);
-        e_enc_W1 = dy::parameter(cg, p_enc_W1);
-
-        e_enc_b2 = dy::parameter(cg, p_enc_b2);
-        e_enc_W2 = dy::parameter(cg, p_enc_W2);
-
-        e_comp_b1 = dy::parameter(cg, p_comp_b1);
-        e_comp_W1a = dy::parameter(cg, p_comp_W1a);
-        e_comp_W1b = dy::parameter(cg, p_comp_W1b);
-
-        e_comp_W2 = dy::parameter(cg, p_comp_W2);
-        e_comp_b2 = dy::parameter(cg, p_comp_b2);
-
-        //e_sink = dy::parameter(cg, p_sink);
+        ex = DecompAttnExprs(cg, decomp_params);
     }
 
     /*
@@ -116,17 +143,19 @@ struct Decomp : public BaseNLI
     // 3.1, Equation 1, this is the function F.
     dy::Expression attend_input(dy::Expression X)
     {
-        auto d = dy::Dim{ hidden_dim_, X.dim()[1] };
+        auto d = dy::Dim{ hidden_dim, X.dim()[1] };
 
-        X = dy::affine_transform({ e_enc_b1, e_enc_W1, X });
+        X = dy::affine_transform({ ex.b_enc1, ex.W_enc1, X });
         X = dy::reshape(X, d);
-
         if (training_)
             X = dy::dropout(X, dropout_p);
         X = dy::rectify(X);
 
-        X = dy::affine_transform({ e_enc_b2, e_enc_W2, X });
+        X = dy::affine_transform({ ex.b_enc2, ex.W_enc2, X });
         X = dy::reshape(X, d);
+        if (training_)
+            X = dy::dropout(X, dropout_p);
+        X = dy::rectify(X);
 
         return X;
     }
@@ -137,22 +166,21 @@ struct Decomp : public BaseNLI
         using dy::affine_transform;
         using dy::rectify;
 
-        //auto d = X.dim();
-        auto d = dy::Dim{ hidden_dim_, X.dim()[1] };
+        auto d = dy::Dim{ hidden_dim, X.dim()[1] };
 
         dy::Expression Y;
-        Y = affine_transform({ e_comp_b1, e_comp_W1a, X, e_comp_W1b, X_ctx });
+        Y =
+          affine_transform({ ex.b_comp1, ex.W_comp1a, X, ex.W_comp1b, X_ctx });
         Y = dy::reshape(Y, d);
         if (training_)
             Y = dy::dropout(Y, dropout_p);
         Y = rectify(Y);
 
-        Y = affine_transform({ e_comp_b2, e_comp_W2, Y });
-        Y = dy::reshape(Y, d);
-
-        if (training_)
-            Y = dy::dropout(Y, dropout_p);
-        Y = rectify(Y);
+         Y = affine_transform({ ex.b_comp2, ex.W_comp2, Y });
+         Y = dy::reshape(Y, d);
+         if (training_)
+             Y = dy::dropout(Y, dropout_p);
+         Y = rectify(Y);
 
         return Y;
     }
@@ -164,27 +192,25 @@ struct Decomp : public BaseNLI
         auto vh_sum = dy::sum_dim(VH, { 1u });
 
         auto Y = dy::affine_transform(
-          { e_out_b1, e_out_W1a, vp_sum, e_out_W1b, vh_sum });
+          { ex.b_agg1, ex.W_agg1a, vp_sum, ex.W_agg1b, vh_sum });
+
         if (training_)
             Y = dy::dropout(Y, dropout_p);
+
         Y = dy::rectify(Y);
-        Y = dy::affine_transform({ e_out_b2, e_out_W2, Y });
+        Y = dy::affine_transform({ ex.b_out, ex.W_out, Y });
         return Y;
     }
 
-    virtual std::vector<dy::Expression> predict_batch(
-      dy::ComputationGraph& cg,
-      const NLIBatch& batch) override
+    std::vector<dy::Expression> predict_batch(dy::ComputationGraph& cg,
+                                              const NLIBatch& batch)
     {
         new_graph(cg);
         std::vector<dy::Expression> out;
 
-        for (auto&& sample : batch) {
+        for (auto& sample : batch) {
             auto enc_prem = embed_sent(cg, sample.prem),
                  enc_hypo = embed_sent(cg, sample.hypo);
-
-            //enc_prem.insert(enc_prem.begin(), e_sink);
-            //enc_hypo.insert(enc_hypo.begin(), e_sink);
 
             auto P = dy::concatenate_cols(enc_prem);
             auto H = dy::concatenate_cols(enc_hypo);
@@ -211,25 +237,44 @@ struct Decomp : public BaseNLI
         return out;
     }
 
+    dy::Expression batch_loss(dy::ComputationGraph& cg,
+                              const NLIBatch& batch)
+    {
+        set_train_time();
+        auto out = predict_batch(cg, batch);
+
+        std::vector<dy::Expression> losses;
+        for (size_t i = 0; i < batch.size(); ++i) {
+            auto loss = dy::pickneglogsoftmax(out[i], batch[i].target);
+            losses.push_back(loss);
+        }
+
+        return dy::average(losses);
+    }
+
+    int n_correct(dy::ComputationGraph& cg, const NLIBatch& batch)
+    {
+        set_test_time();
+        auto out_v = predict_batch(cg, batch);
+        auto out_b = dy::concatenate_to_batch(out_v);
+
+        cg.incremental_forward(out_b);
+        auto out = out_b.value();
+        auto pred = dy::as_vector(dy::TensorTools::argmax(out));
+
+        int n_correct = 0;
+        for (size_t i = 0; i < batch.size(); ++i) {
+            if (batch[i].target == pred[i])
+                n_correct += 1;
+        }
+        return n_correct;
+    }
+
+    DecompAttnParams decomp_params;
+    DecompAttnExprs ex;
     AttnOpts::Attn attn_type;
     std::unique_ptr<BiAttentionBuilder> attn;
-
-    dy::Parameter p_out_b1, p_out_W1a, p_out_W1b;
-    dy::Parameter p_out_b2, p_out_W2;
-    dy::Parameter p_enc_b1, p_enc_W1;
-    dy::Parameter p_enc_b2, p_enc_W2;
-    dy::Parameter p_comp_b1, p_comp_W1a, p_comp_W1b;
-    dy::Parameter p_comp_b2, p_comp_W2;
-    //dy::Parameter p_sink;
-
-    dy::Expression e_out_b1, e_out_W1a, e_out_W1b;
-    dy::Expression e_out_b2, e_out_W2;
-    dy::Expression e_enc_b1, e_enc_W1;
-    dy::Expression e_enc_b2, e_enc_W2;
-    dy::Expression e_comp_b1, e_comp_W1a, e_comp_W1b;
-    dy::Expression e_comp_b2, e_comp_W2;
-    //dy::Expression e_sink;
-
     float dropout_p;
+    unsigned hidden_dim;
 };
 

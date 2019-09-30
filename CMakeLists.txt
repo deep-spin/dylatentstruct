@@ -82,10 +82,10 @@ target_include_directories(
 )
 
 target_compile_options(dylatentstruct PUBLIC
-    #    -Ofast
+    -Ofast
 #     -Werror
-    -O0
-    -g
+#    -O0
+#    -g
     -Wall
     -Wextra
     -pedantic
@@ -100,6 +100,7 @@ add_executable(decomp src/bin/decomp.cpp)
 add_executable(test-arcs-to-adj src/test/test-arcs-to-adj.cpp)
 add_executable(test-mrt src/test/test-mrt.cpp)
 add_executable(test-eval src/test/test-eval.cpp)
+add_executable(test-matchings src/test/test-matchings.cpp)
 add_executable(test-custom-trees src/test/test-custom-trees.cpp)
 
 target_link_libraries(sentclf PUBLIC dylatentstruct)
@@ -109,5 +110,6 @@ target_link_libraries(decomp PUBLIC dylatentstruct)
 target_link_libraries(test-arcs-to-adj PUBLIC dylatentstruct)
 target_link_libraries(test-mrt PUBLIC dylatentstruct)
 target_link_libraries(test-eval PUBLIC dylatentstruct)
+target_link_libraries(test-matchings PUBLIC dylatentstruct)
 target_link_libraries(test-custom-trees PUBLIC dylatentstruct)
 #target_link_libraries(check PUBLIC dylatentstruct)
