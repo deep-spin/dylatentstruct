@@ -258,7 +258,6 @@ MatchingBuilder::attend(const dynet::Expression scores,
     unsigned prem_sz = d[0], hypo_sz = d[1];
 
     auto fg = std::make_unique<AD3::FactorGraph>();
-    fg->SetVerbosity(100);
 
     std::vector<AD3::BinaryVariable*> vars;
     for (size_t j = 0; j < hypo_sz; ++j) {
@@ -277,8 +276,6 @@ MatchingBuilder::attend(const dynet::Expression scores,
     auto u = dy::sparsemap(eta_u, std::move(fg), opts);
 
     u = dy::reshape(u, d);
-    std::cout << u.value() << std::endl;
-    std::abort();
 
     //std::cout << u.value() << std::endl;
     //std::cout << dy::sum_dim(u, {0u}).value() << std::endl;
