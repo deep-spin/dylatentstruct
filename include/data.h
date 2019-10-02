@@ -40,13 +40,22 @@ struct NLIPair
     { return prem.word_ixs.size() + hypo.word_ixs.size(); }
 };
 
+struct MultiLabelInstance
+{
+    std::vector<int> features;
+    std::vector<int> labels;
+    size_t size() const { return features.size(); }
+};
+
 typedef std::vector<LabeledSentence> SentBatch;
 typedef std::vector<TaggedSentence> TaggedBatch;
 typedef std::vector<NLIPair> NLIBatch;
+typedef std::vector<MultiLabelInstance> MLBatch;
 
 std::istream& operator>>(std::istream& in, LabeledSentence& data);
 std::istream& operator>>(std::istream& in, TaggedSentence& data);
 std::istream& operator>>(std::istream& in, NLIPair& data);
+std::istream& operator>>(std::istream& in, MultiLabelInstance& data);
 
 
 template<typename T>

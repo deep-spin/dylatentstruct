@@ -126,3 +126,30 @@ operator>>(std::istream& in, NLIPair& data)
 
     return in;
 }
+
+std::istream&
+operator>>(std::istream& in, MultiLabelInstance& data)
+{
+    std::string target_buf, feats_buf;
+    std::getline(in, target_buf, '\t');
+    std::getline(in, feats_buf, '\n');
+
+    if (!in)  // failed
+        return in;
+
+    {
+        std::stringstream ixs(target_buf);
+        unsigned tmp;
+        while(ixs >> tmp)
+            data.labels.push_back(tmp);
+    }
+
+    {
+        std::stringstream ixs(feats_buf);
+        unsigned tmp;
+        while(ixs >> tmp)
+            data.features.push_back(tmp);
+    }
+
+    return in;
+}

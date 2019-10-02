@@ -2,6 +2,10 @@
 
 #include <vector>
 #include <ostream>
+#include <algorithm>
+#include <tuple>
+
+#include <iostream>
 
 struct PRFResult
 {
@@ -91,6 +95,33 @@ class ConfusionMatrix
                                     const ConfusionMatrix& cm);
     friend ConfusionMatrix operator+(const ConfusionMatrix& cm1,
                                      const ConfusionMatrix& cm2);
+
+};
+
+struct MultiLabelPRF {
+
+    void insert(std::vector<float> scores, std::vector<int> y) {
+        n += 1;
+        auto true_lbl = y.size();
+        auto pred_lbl = std::count_if(scores.begin(), scores.end(),
+                [](float f) { return f > 0.5; });
+        auto true_pos = std::count_if(y.begin(), y.end(),
+                [&scores](int ix) { return scores[ix] > 0.5; });
+
+        prec += true_pos / (1e-30 + pred_lbl);
+        rec += true_pos / (1e-30 + true_lbl);
+    }
+
+    std::tuple<float, float, float> get_prf() {
+        float precision = prec / n;
+        float recall = rec / n;
+        float f_score = 2 * precision * recall / (1e-30 + precision + recall);
+        return std::make_tuple(precision, recall, f_score);
+    }
+
+    int n = 0;
+    float prec = 0;
+    float rec = 0;
 
 };
 

@@ -554,6 +554,48 @@ struct SparseMAPOpts : BaseOpts
     }
 };
 
+struct MultiLabelOpts : public BaseOpts
+{
+
+    std::string dataset = "bibtex";
+    std::string method = "simple";
+
+    virtual void parse(int argc, char** argv)
+    {
+        int i = 1;
+        while (i < argc) {
+            std::string arg = argv[i];
+            if (arg == "--dataset") {
+                assert(i + 1 < argc);
+                dataset = argv[i + 1];
+                i += 2;
+            } else if (arg == "--method") {
+                assert(i + 1 < argc);
+                method = argv[i + 1];
+                i += 2;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    virtual std::ostream& print(std::ostream& o) const override
+    {
+        o << " MultiLabel settings\n"
+          << " dataset: " << dataset << '\n'
+          << " : " << method << '\n';
+        return o;
+    }
+
+    virtual std::string get_filename() const override
+    {
+        std::ostringstream fn;
+        fn << "_" << dataset << "_" << method << "_";
+        return fn.str();
+    }
+};
+
+
 std::ostream&
 operator<<(std::ostream& o, const BaseOpts& opts)
 {
