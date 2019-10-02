@@ -20,6 +20,9 @@ BiSoftmaxBuilder::apply(const dynet::Expression scores, const NLIPair&)
     auto U_hypo = dy::transpose(dy::softmax(scores, 1));
     auto U_prem = dy::transpose(dy::softmax(dy::transpose(scores), 1));
 
+    if (out)
+        (*out) << U_hypo.value() << "\n" << U_prem.value() << "\n\n";
+
     return std::tie(U_prem, U_hypo);
 }
 
@@ -76,6 +79,10 @@ SymmBiAttnBuilder::apply(const dynet::Expression scores,
         U_p = dy::to_device(U_p, device);
         U_h = dy::transpose(U_p);
     }
+
+    if (out)
+        (*out) << U_h.value() << "\n" << U_p.value() << "\n\n";
+
     return std::tie(U_p, U_h);
 
 }

@@ -16,11 +16,20 @@ struct BiAttentionBuilder
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
       const dynet::Expression scores,
       const NLIPair& sample) = 0;
+
+    virtual void set_print(const std::string& fn) {
+        out = std::make_shared<std::ofstream>(fn);
+    }
+
+    virtual void clear_print() {
+        out.reset();
+    }
+
+    std::shared_ptr<std::ostream> out;
 };
 
 struct BiSoftmaxBuilder : BiAttentionBuilder
 {
-
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
       const dynet::Expression scores,
       const NLIPair& sample);
@@ -28,7 +37,6 @@ struct BiSoftmaxBuilder : BiAttentionBuilder
 
 struct BiSparsemaxBuilder : BiAttentionBuilder
 {
-
     virtual std::tuple<dynet::Expression, dynet::Expression> apply(
       const dynet::Expression scores,
       const NLIPair& sample);
@@ -67,7 +75,6 @@ struct MatchingBuilder : SymmBiAttnBuilder
     virtual dynet::Expression attend(const dynet::Expression scores,
                                      const std::vector<int>& prem_heads,
                                      const std::vector<int>& hypo_heads);
-
 };
 
 struct XORMatchingBuilder : SymmBiAttnBuilder

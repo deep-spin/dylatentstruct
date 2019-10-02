@@ -1,7 +1,10 @@
 #include <algorithm>
 #include <iostream>
 
+#include "args.h"
+#include "data.h"
 #include "mlflow.h"
+#include "models/basemodel.h"
 #include "models/decomp.h"
 #include "utils.h"
 #include <dynet/timing.h>
@@ -25,6 +28,26 @@ validate(std::unique_ptr<DecompAttn>& clf, const std::vector<NLIBatch>& data)
     }
 
     return float(n_correct) / n_total;
+}
+
+void
+test(
+    std::unique_ptr<DecompAttn>& clf,
+    const TrainOpts& opts,
+    const std::string& valid_fn,
+    const std::string& test_fn)
+{
+    clf->load(opts.saved_model);
+
+    clf->attn->set_print(opts.saved_model + ".valid-attn.txt");
+    auto valid_data = read_batches<NLIPair>(valid_fn, opts.batch_size);
+    auto valid_acc = validate(clf, valid_data);
+    cout << "Valid accuracy: " << valid_acc << endl;
+
+    clf->attn->set_print(opts.saved_model + ".test-attn.txt");
+    auto test_data = read_batches<NLIPair>(test_fn, opts.batch_size);
+    auto test_acc = validate(clf, test_data);
+    cout << " Test accuracy: " << test_acc << endl;
 }
 
 void
