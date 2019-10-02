@@ -254,6 +254,10 @@ main(int argc, char** argv)
                                             decomp_opts.update_embed);
 
     clf->load_embeddings(embed_fn.str(), decomp_opts.normalize_embed);
-    train(clf, opts, fn.str(), train_fn.str(), valid_fn.str(), mlflow);
+
+    if (opts.test)
+        test(clf, opts, valid_fn.str(), test_fn.str());
+    else
+        train(clf, opts, fn.str(), train_fn.str(), valid_fn.str(), mlflow);
     return 0;
 }
