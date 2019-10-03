@@ -28,11 +28,16 @@ using std::endl;
 
 ConfusionMatrix validate(
     std::unique_ptr<GCNTagger>& clf,
-    const vector<TaggedBatch>& data)
+    const vector<TaggedBatch>& data,
+    unsigned min_length=0)
 {
     auto cm = ConfusionMatrix { clf->n_classes_ };
     for (auto&& valid_batch : data)
     {
+        TaggedBatch filtered;
+        for (auto sent : valid_batch)
+            if (sent.size() >= min_length)
+                filtered.push_back(sent);
         dy::ComputationGraph cg;
         cm += clf->confusion_matrix(cg, valid_batch);
     }
@@ -46,13 +51,14 @@ test(
     std::unique_ptr<GCNTagger>& clf,
     const TrainOpts& opts,
     const std::string& valid_fn,
-    const std::string& test_fn)
+    const std::string& test_fn,
+    unsigned min_length=0)
 {
     clf->load(opts.saved_model);
 
     clf->tree->set_print(opts.saved_model + "valid-trees.txt");
     auto valid_data = read_batches<TaggedSentence>(valid_fn, opts.batch_size);
-    auto valid_cm = validate(clf, valid_data);
+    auto valid_cm = validate(clf, valid_data, min_length);
 
     std::cout << valid_cm << std::endl;
 
@@ -62,7 +68,7 @@ test(
 
     clf->tree->set_print(opts.saved_model + "test-trees.txt");
     auto test_data = read_batches<TaggedSentence>(test_fn, opts.batch_size);
-    auto test_cm = validate(clf, test_data);
+    auto test_cm = validate(clf, test_data, min_length);
     cout << "Test accuracy: " << test_cm.accuracy() << endl;
     auto test_prf = test_cm.precision_recall_f1();
     cout << "Valid F1: " << test_prf.average_fscore() << endl;
@@ -263,7 +269,7 @@ int main(int argc, char** argv)
     //clf->load_embeddings(embed_fn.str());
 
     if (opts.test) {
-        test(clf, opts, valid_fn.str(), test_fn.str());
+        test(clf, opts, valid_fn.str(), test_fn.str(), 8);
         return 0;
     }
 

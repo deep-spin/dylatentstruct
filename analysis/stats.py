@@ -35,7 +35,7 @@ def tag():
     "gcn_budget", "SM_eta", "SM_maxit", "SM_ASET_maxit", "dim"]
 
     test_cols = ["fn_prefix", "lr", "Run ID", "Name", "strategy", "SM_ASET_maxit", "SM_eta", "SM_maxit", "SM_thr",
-    "batch_size", "dataset", "best_valid_f1", "dim"]
+    "batch_size", "dataset", "best_valid_f1", "dim", "gcn_layers", "gcn_budget"]
 
     # data = data.ix[('reimp' in fn for fn in data.fn_prefix)]
     best_ix = []
