@@ -39,7 +39,7 @@ ConfusionMatrix validate(
             if (sent.size() >= min_length)
                 filtered.push_back(sent);
         dy::ComputationGraph cg;
-        cm += clf->confusion_matrix(cg, valid_batch);
+        cm += clf->confusion_matrix(cg, filtered);
     }
 
     return cm;
