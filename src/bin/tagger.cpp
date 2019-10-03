@@ -269,7 +269,7 @@ int main(int argc, char** argv)
     //clf->load_embeddings(embed_fn.str());
 
     if (opts.test) {
-        test(clf, opts, valid_fn.str(), test_fn.str(), 8);
+        test(clf, opts, valid_fn.str(), test_fn.str());
         return 0;
     }
 
