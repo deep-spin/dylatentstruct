@@ -24,16 +24,17 @@ def main():
             shutil.copy(in_f, out_f)
             
             print(f"""
-build/decomp --test
+build/decomp --test \\
 --saved-model {out_f} \\
---dataset {row['dataset']}
+--dataset {row['dataset']} \\
+--dim 100 \\
 --batch-size {row['batch_size']} \\
 --normalize-embed \\
 --drop 0 \\
 --attn {row['attention']} \\
 --sparsemap-eta {row['SM_eta']} \\
---sparsemap-max-iter {int(row['SM_maxit'])} \\
---sparsemap-active-set-iter {int(row['SM_ASET_maxit'])} \\
+--sparsemap-max-iter {row['SM_maxit']} \\
+--sparsemap-active-set-iter {row['SM_ASET_maxit']} \\
 --dynet-mem 2048;
 """, file=script_f)
 
