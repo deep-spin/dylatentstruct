@@ -32,9 +32,9 @@ def tag():
     fn = sys.argv[1]
     data = pandas.read_csv(fn)
     cols = ["fn_prefix", "Run ID", "Name", "strategy", "lr", "best_valid_f1",
-    "gcn_budget", "SM_eta", "dim"]
+    "gcn_budget", "SM_eta", "SM_maxit", "SM_ASET_maxit", "dim"]
 
-    test_cols = ["fn_prefix", "Run ID", "Name", "strategy", "SM_ASET_maxit", "SM_eta", "SM_maxit", "SM_thr",
+    test_cols = ["fn_prefix", "lr", "Run ID", "Name", "strategy", "SM_ASET_maxit", "SM_eta", "SM_maxit", "SM_thr",
     "batch_size", "dataset", "best_valid_f1", "dim"]
 
     # data = data.ix[('reimp' in fn for fn in data.fn_prefix)]
@@ -55,6 +55,6 @@ def tag():
 
 
 if __name__ == '__main__':
-    nli()
-    # tag()
+    # nli()
+    tag()
 

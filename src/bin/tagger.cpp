@@ -64,6 +64,8 @@ test(
     auto test_data = read_batches<TaggedSentence>(test_fn, opts.batch_size);
     auto test_cm = validate(clf, test_data);
     cout << "Test accuracy: " << test_cm.accuracy() << endl;
+    auto test_prf = test_cm.precision_recall_f1();
+    cout << "Valid F1: " << test_prf.average_fscore() << endl;
 }
 
 
