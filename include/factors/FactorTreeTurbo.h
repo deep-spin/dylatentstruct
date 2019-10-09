@@ -44,6 +44,12 @@ public:
                 Configuration &configuration,
                 double *value) {
     vector<int>* heads = static_cast<vector<int>*>(configuration);
+
+    if (length_ == 1) {
+        heads->at(0) = -1;
+        return;
+    }
+
     if (projective_) {
       decoder.RunEisner(length_, num_arcs_, index_arcs_, variable_log_potentials,
                           heads, value);
