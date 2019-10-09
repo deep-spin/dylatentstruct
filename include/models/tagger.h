@@ -66,10 +66,10 @@ struct GCNTagger : public BaseEmbedModel
             tree = std::make_unique<CustomAdjacency>();
         else if (tree_type == GCNOpts::Tree::MST)
             tree = std::make_unique<MSTAdjacency>(
-              p, smap_opts, hidden_dim, false, gcn_opts_.budget);
+              p, smap_opts, hidden_dim, false, gcn_opts_.budget, gcn_opts_.projective);
         else if (tree_type == GCNOpts::Tree::MST_LSTM)
             tree = std::make_unique<MSTLSTMAdjacency>(
-              p, smap_opts, hidden_dim, dropout_, gcn_opts_.budget);
+              p, smap_opts, hidden_dim, dropout_, gcn_opts_.budget, gcn_opts_.projective);
         else {
             std::cerr << "Not implemented";
             std::abort();

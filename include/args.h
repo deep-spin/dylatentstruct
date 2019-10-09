@@ -150,6 +150,7 @@ struct GCNOpts : BaseOpts
     unsigned iter = 1;
     unsigned use_distance = false;
     int budget = 0;
+    bool projective = false;
 
     float dropout = .1f;
     std::string tree_str = "gold";
@@ -221,6 +222,9 @@ struct GCNOpts : BaseOpts
                 assert(i + 1 < argc);
                 tree_str = argv[i + 1];
                 i += 2;
+            } else if (arg == "--projective") {
+                projective = true;
+                i += 1;
             } else if (arg == "--use-distance") {
                 use_distance = true;
                 i += 1;
@@ -238,6 +242,7 @@ struct GCNOpts : BaseOpts
         o << " GCN dropout: " << dropout << '\n';
         o << "        tree: " << tree_str << '\n';
         o << "      budget: " << budget << '\n';
+        o << "  projective: " << projective << '\n';
         o << "    use dist: " << use_distance << '\n';
         return o;
     }
@@ -251,6 +256,7 @@ struct GCNOpts : BaseOpts
                << "_gcndrop_" << dropout
                << "_strat_" << tree_str
                << "_usedist_" << use_distance
+               << "_projective_" << projective
                << "_budget_" << budget;
         return fn.str();
     }
