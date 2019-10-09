@@ -19,10 +19,17 @@ int main(int argc, char** argv)
     dy::ParameterCollection params;
     auto emb = params.add_lookup_parameters(vocab_size, { embed_dim });
 
-    int budget = 3;
+    int budget = 0;
+    bool projective = false;
+
     dy::SparseMAPOpts opts;
-    opts.eta = 0.01;
-    //opts.max_iter = 1;
+    if (budget > 0) {
+        opts.eta = .5;
+        opts.max_iter = 10;
+    } else {
+        opts.eta = 1;
+        opts.max_iter = 1;
+    }
     opts.max_active_set_iter = 50;
     opts.log_stream = std::make_shared<std::ofstream>("log.txt");
 
@@ -33,10 +40,15 @@ int main(int argc, char** argv)
     sent.word_ixs.push_back(0);
 
     sent.heads.push_back(-1);
-    sent.heads.push_back(2);
+
     sent.heads.push_back(0);
-    sent.heads.push_back(2);
-    sent.heads.push_back(2);
+    sent.heads.push_back(0);
+    sent.heads.push_back(0);
+    sent.heads.push_back(0);
+    //sent.heads.push_back(2);
+    //sent.heads.push_back(0);
+    //sent.heads.push_back(2);
+    //sent.heads.push_back(2);
 
     for (auto && h : sent.word_ixs)
         std::cout << h << " ";
@@ -46,7 +58,7 @@ int main(int argc, char** argv)
     std::cout << std::endl;
 
     //auto tree = MSTLSTMAdjacency{ params, opts, embed_dim };
-    auto tree = MSTAdjacency{ params, opts, embed_dim, false, budget };
+    auto tree = MSTAdjacency{ params, opts, embed_dim, false, budget, projective};
 
     dy::AdamTrainer trainer(params, 0.01);
 
@@ -69,10 +81,14 @@ int main(int argc, char** argv)
 
         auto y_true_cols = std::vector<dy::Expression>{};
         y_true_cols.push_back(dy::zeros(cg, { 5u }));
-        y_true_cols.push_back(dy::one_hot(cg, 5u, 2u));
         y_true_cols.push_back(dy::one_hot(cg, 5u, 0u));
-        y_true_cols.push_back(dy::one_hot(cg, 5u, 2u));
-        y_true_cols.push_back(dy::one_hot(cg, 5u, 2u));
+        y_true_cols.push_back(dy::one_hot(cg, 5u, 0u));
+        y_true_cols.push_back(dy::one_hot(cg, 5u, 0u));
+        y_true_cols.push_back(dy::one_hot(cg, 5u, 0u));
+        //y_true_cols.push_back(dy::one_hot(cg, 5u, 2u));
+        //y_true_cols.push_back(dy::one_hot(cg, 5u, 0u));
+        //y_true_cols.push_back(dy::one_hot(cg, 5u, 2u));
+        //y_true_cols.push_back(dy::one_hot(cg, 5u, 2u));
         auto y_true = dy::concatenate_cols(y_true_cols);
 
         auto loss = dy::squared_distance(y_true, out);

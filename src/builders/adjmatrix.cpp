@@ -1,5 +1,5 @@
 #include "builders/adjmatrix.h"
-#include "factors/FactorTree.h"
+#include "factors/FactorTreeTurbo.h"
 #include "layers/arcs-to-adj.h"
 
 #include <dynet/devices.h>
@@ -86,11 +86,13 @@ MSTAdjacency::MSTAdjacency(dy::ParameterCollection& params,
                            const dy::SparseMAPOpts& opts,
                            unsigned hidden_dim,
                            bool use_distance,
-                           int budget)
+                           int budget,
+                           bool projective)
   : opts{ opts }
   , scorer{ params, hidden_dim, hidden_dim }
   , distance_bias{ params, use_distance }
   , budget{ budget }
+  , projective{ projective }
 {}
 
 void
@@ -109,7 +111,8 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
     std::vector<std::tuple<int, int>> arcs;
     unsigned sz = enc.size();
 
-    if (sz > 385) { // 99th percentile: use flat
+    // if (sz > 385) { // 99th percentile: use flat
+    if (sz > 500) { // 99th percentile: use flat
         std::vector<unsigned> nonneg_heads(sz - 1, 0);
         return ::make_fixed_adj(*cg_, nonneg_heads);
     }
@@ -130,10 +133,14 @@ MSTAdjacency::make_adj(const std::vector<dy::Expression>& enc, const Sentence&)
         }
     }
 
-    // ugly transfer of ownership, as in AD3. How to be safer?
-    AD3::Factor* tree_factor = new AD3::FactorTree;
+    // Old tree factor
+    // AD3::Factor* tree_factor = new AD3::FactorTree;
+    // fg->DeclareFactor(tree_factor, vars, /*pass_ownership=*/true);
+    // static_cast<AD3::FactorTree*>(tree_factor)->Initialize(sz, arcs);
+
+    AD3::Factor* tree_factor = new AD3::FactorTreeTurbo;
     fg->DeclareFactor(tree_factor, vars, /*pass_ownership=*/true);
-    static_cast<AD3::FactorTree*>(tree_factor)->Initialize(sz, arcs);
+    static_cast<AD3::FactorTreeTurbo*>(tree_factor)->Initialize(projective, sz, arcs);
 
     if (budget > 0)
         for (size_t h = 0; h < sz; ++h)
@@ -159,8 +166,9 @@ MSTLSTMAdjacency::MSTLSTMAdjacency(dy::ParameterCollection& params,
                                    const dy::SparseMAPOpts& opts,
                                    unsigned hidden_dim,
                                    float dropout_p,
-                                   int budget)
-  : MSTAdjacency{ params, opts, hidden_dim, /*dist=*/false,  budget}
+                                   int budget,
+                                   bool projective)
+  : MSTAdjacency{ params, opts, hidden_dim, /*dist=*/false, budget, projective}
   , bilstm_settings{ /*stacks=*/1, /*layers=*/1, hidden_dim / 2 }
   , bilstm{ params, bilstm_settings, hidden_dim }
   , dropout_p{ dropout_p }

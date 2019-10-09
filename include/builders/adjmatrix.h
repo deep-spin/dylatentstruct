@@ -64,7 +64,8 @@ struct MSTAdjacency : TreeAdjacency
                           const dy::SparseMAPOpts& opts,
                           unsigned hidden_dim,
                           bool use_distance=true,
-                          int budget=0);
+                          int budget=0,
+                          bool projective=false);
 
     virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
                                     const Sentence& sent) override;
@@ -83,6 +84,7 @@ struct MSTAdjacency : TreeAdjacency
     BilinearScoreBuilder scorer;
     DistanceBiasBuilder distance_bias;
     int budget;
+    bool projective;
 };
 
 
@@ -93,7 +95,8 @@ struct MSTLSTMAdjacency : MSTAdjacency
                               const dy::SparseMAPOpts& opts,
                               unsigned hidden_dim,
                               float dropout_p=.0f,
-                              int budget=0);
+                              int budget=0,
+                              bool projective=false);
 
     virtual dy::Expression make_adj(const std::vector<dy::Expression>&,
                                     const Sentence& sent) override;

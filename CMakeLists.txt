@@ -55,6 +55,7 @@ add_library(
     src/builders/adjmatrix.cpp
     src/builders/distance-bias.cpp
     src/factors/FactorTree.cpp
+    src/factors/DependencyDecoder.cpp
     src/layers/arcs-to-adj.cpp
 )
 
