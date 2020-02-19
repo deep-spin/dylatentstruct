@@ -265,6 +265,10 @@ struct ListopsTagger : public GCNTagger
                     h = dy::dropout(h, dropout_);
             }
 
+            // XXX: this wasn't here before in AISTATS sub
+            // root is a vector of all zeros. We have biases.
+            ctx.insert(ctx.begin(), dy::zeros(cg, {hidden_dim_}));
+
             // get adj tree from true embeddings (root already included)
             auto G = tree->make_adj(ctx, sample.sentence);
 
@@ -272,11 +276,14 @@ struct ListopsTagger : public GCNTagger
 
             auto delex_sentence = sample.sentence;
             delex_sentence.word_ixs = \
-                std::vector<unsigned int>(delex_sentence.size(), DEL_IX);
+                std::vector<unsigned int>(1 + delex_sentence.size(), DEL_IX);
             auto delex = embed_sent(cg, delex_sentence);
 
             auto X = dy::concatenate_cols(delex);
             auto H = gcn.apply(X, G);
+
+            // drop the root
+            H = dy::pick_range(H, 1, sample.size() + 1, 1);
 
             // dropout h
             if (training_)

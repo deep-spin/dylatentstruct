@@ -144,6 +144,14 @@ public:
     }
   }
 
+    virtual void
+    PrintConfiguration(std::ostream& out, const Configuration y) override
+    {
+        vector<int>* heads = static_cast<vector<int>*>(y);
+        for (auto && h : *heads)
+            out << h << " ";
+    }
+
 private:
   bool projective_; // If true, assume projective trees.
   int length_; // Sentence length (including root symbol).
